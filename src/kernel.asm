@@ -23,9 +23,14 @@
     %define STACK_SEG  0x0f00                   ; (STACK_SEG  << 4) + STACK_OFF  = 0x010000
     %define STACK_OFF  0x1000
 
-    %define KERNEL_SEG 0x0000                   ; (KERNEL_SEG << 4) + KERNEL_OFF = 0x001000
+    %define KERNEL_SEG 0x0100                   ; (KERNEL_SEG << 4) + KERNEL_OFF = 0x001000
     %define KERNEL_OFF 0x0000
 
+    %ifidn __OUTPUT_FORMAT__, elf               ; WARNING: Assumes that the text segment is set to
+      %define KERNEL_SEG 0x0000                 ; 0x7c00, used ONLY for debugging with GDB
+      %define KERNEL_OFF $$
+    %endif
+    
     bits 16                                     ; Ensure 16-bit code, because fuck 32-bit
     cpu  8086                                   ; Assemble with the 8086 instruction set
     

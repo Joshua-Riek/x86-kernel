@@ -16,12 +16,15 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
+    
+;---------------------------------------------------
+; Memory manager varables
+;---------------------------------------------------
 
     curY  db 0                                  ; Cursor Y pos value
     curX  db 0                                  ; Cursor X pos value
     color db 7                                  ; Text color
     screen times 2000 dw 0                      ; Screen buffer
-
 
 ;---------------------------------------------------
 setupVideo:
@@ -48,10 +51,14 @@ setupVideo:
     
     mov ah, 0x03                                ; Get cursor pos and shape
     int 0x10                                    ; Video interupt
-    
+
+    push ds
+    mov ax, cs
+    mov ds, ax
     mov byte [curX], dl                         ; Current cursor x pos
     mov byte [curY], dh                         ; Current cursor y pos
-
+    pop ds
+    
     pop dx                                      ; Restore registers
     pop cx
     pop bx
@@ -77,28 +84,28 @@ videoWriteChar:
     push es
     push ds
 
-    mov bx, cs
-    mov ds, bx
-    
     mov dl, al                                  ; Save the char 
 
     mov ax, 0xb800                              ; Video memory segment
     mov es, ax 
 
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure data refrences 
+    
     mov ax, 80 * 2                              ; Take the size of a char by the screen width
-    mov bl, byte [cs:curY]                      ; Get the cursor Y pos
+    mov bl, byte [curY]                         ; Get the cursor Y pos
     mul bl                                      ; Multiply ax * bl = ax
     mov cx, ax                                  ; Store output in cx
 
     mov ax, 2                                   ; The size of a char
-    mov bl, byte [cs:curX]                      ; Get the cursor X pos
+    mov bl, byte [curX]                         ; Get the cursor X pos
     mul bl                                      ; Multiply ax * bl = ax
 
     xor di, di                                  ; Video memory offset
     add di, ax                                  ; Add the cursor X pos offset
     add di, cx                                  ; Add the cursor Y pos offset
 
-    mov bh, byte [cs:color]                     ; Attribute (Background | Foreground)
+    mov bh, byte [color]                        ; Attribute (Background | Foreground)
     xchg bl, dl                                 ; Get the char back from dl
 
     cmp bl, 0x0a                                ; Is the character a line feed?
@@ -110,19 +117,19 @@ videoWriteChar:
     cmp bl, 0x09                                ; Is the character a horizontal tab?
     je .tab                                     ; If so, make a tab
     
-    cmp byte [cs:curX], 80                      ; Is the cursor X pos is greater than 80?
+    cmp byte [curX], 80                         ; Is the cursor X pos is greater than 80?
     jge .row2                                   ; If so then make a new line
 
     mov word [es:di], bx                        ; Write into the video memory address
-
-    inc byte [cs:curX]                          ; Increase the cursor X pos
+ 
+    inc byte [curX]                             ; Increase the cursor X pos
     jmp .done
 
   .tab:
     xor dx, dx                                  ; Clear remander
 
     xor ah, ah
-    mov al, byte [cs:curX]                     ; Get the cursor x pos
+    mov al, byte [curX]                         ; Get the cursor x pos
     or ax, ax                                   ; If the curosor is zero then just continue
     jz .tabPadLen
     
@@ -142,8 +149,8 @@ videoWriteChar:
     jmp .done
 
   .row2:
-    mov byte [cs:curX], 0                       ; Reset the cursor X pos to zero
-    inc byte [cs:curY]                          ; Increase the cursor Y pos
+    mov byte [curX], 0                          ; Reset the cursor X pos to zero
+    inc byte [curY]                             ; Increase the cursor Y pos
     
     call videoScroll                            ; See if the the screen must scroll up a line
 
@@ -153,11 +160,11 @@ videoWriteChar:
     jmp .done
   
   .lf:
-    mov byte [cs:curX], 0                       ; Reset the cursor X pos to zero
+    mov byte [curX], 0                          ; Reset the cursor X pos to zero
     jmp .done
 
   .nl:
-    inc byte [cs:curY]                          ; Increase the cursor Y pos
+    inc byte [curY]                             ; Increase the cursor Y pos
     
     call videoScroll                            ; See if the the screen must scroll up a line
 
@@ -216,10 +223,10 @@ videoScroll:
     push es
     push ds
 
-    mov bx, cs
-    mov ds, bx
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences 
 
-    cmp byte [cs:curY], 25                      ; See if scrolling the screen is even needed
+    cmp byte [curY], 25                         ; See if scrolling the screen is even needed
     jnge .done
     
     mov ax, 0xb800                              ; Video memory segment
@@ -240,7 +247,7 @@ videoScroll:
     mov di, 24*(80*2)                           ; This is the bottom line
     
   .clearLine:
-    mov ah, byte [cs:color]                     ; Grab the current text color
+    mov ah, byte [color]                        ; Grab the current text color
     mov al, ' '                                 ; Fill with a whitespace
     
     mov word [es:di], ax                        ; Shove the byte to the bottom line in es:di
@@ -250,10 +257,10 @@ videoScroll:
     cmp di, 25*(80*2)                           ; Continue untill the bottom line is cleared
     jle .clearLine
     
-    mov byte [cs:curY], 24                      ; Decrease the cursor ypos
+    mov byte [curY], 24                         ; Decrease the cursor ypos
 
   .done:
-    pop ds
+    pop ds                                      ; Restore registers
     pop es
     pop di
     pop ax
@@ -275,22 +282,27 @@ videoWriteNum:
     push bx
     push dx
     push si
+    push ds
+
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences 
     
     xor dx, dx                                  ; Handle a 16-bit number
-    mov si, .buffer1                            ; Output string buffer
+    mov si, .buffer                             ; Output string buffer
     call itoa                                   ; Convert the number to a string
 
-    mov si, .buffer1
+    mov si, .buffer 
     call videoWriteStr                          ; Print the buffer that is now padded
     
-    pop si                                      ; Restore registers
+    pop ds                                      ; Restore registers
+    pop si
     pop dx
     pop bx
     pop ax
     
     ret
 
-  .buffer1 times 32 db 0
+  .buffer times 32 db 0
     
 ;---------------------------------------------------
 videoWriteNumPadding:
@@ -309,14 +321,19 @@ videoWriteNumPadding:
     push ax                                     ; Save registers
     push bx
     push cx
+    push dx
     push si
     push di
+    push ds
+    push es
     
-    push dx
+    mov dx, cs                                  ; Set the data segment to the code segment
+    mov ds, dx                                  ; This is to ensure correct data refrences 
+    mov es, dx
+    
     xor dx, dx                                  ; Handle a 16-bit number
     mov si, .buffer1                            ; Output string buffer
     call itoa                                   ; Convert the number to a string
-    pop dx
     
     mov al, cl                                  ; Move the char to pad with into al
     mov cl, ch                                  ; Move the padding length into cl
@@ -326,9 +343,12 @@ videoWriteNumPadding:
     
     mov si, .buffer2
     call videoWriteStr                          ; Print the buffer that is now padded
-    
-    pop di                                      ; Restore registers
+
+    pop es                                      ; Restore registers
+    pop ds
+    pop di
     pop si
+    pop dx
     pop cx
     pop bx
     pop ax
@@ -357,7 +377,15 @@ videoWriteNumPadding32:
     push dx
     push si
     push di
+    push ds
+    push es
 
+    push dx
+    mov dx, cs                                  ; Set the data segment to the code segment
+    mov ds, dx                                  ; This is to ensure correct data refrences 
+    mov es, dx
+    pop dx
+    
     mov si, .buffer1
     call itoa                                   ; Convert the 32 bit number in dx:ax
 
@@ -370,7 +398,9 @@ videoWriteNumPadding32:
     mov si, .buffer2                            ; Print the buffer that is now padded
     call videoWriteStr
 
-    pop di                                      ; Restore registers
+    pop es                                      ; Restore registers
+    pop ds
+    pop di
     pop si
     pop dx
     pop cx
@@ -392,10 +422,17 @@ videoClearScreen:
 ; Returns: Nothing
 ;
 ;---------------------------------------------------
-    push es                                     ; Save registers
-    push ax
+    push ax                                     ; Save registers
+    push bx
     push cx
+    push dx
+    push si
     push di
+    push ds
+    push es
+
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences     
 
     mov ax, 0xb800                              ; Video memory segment
     mov es, ax 
@@ -403,17 +440,21 @@ videoClearScreen:
     cld                                         ; Clear direction flag
     xor di, di                                  ; Video memory offset
     mov cx, 2000                                ; Times to reapeat
-    mov ah, byte [cs:color]                     ; Set current color
+    mov ah, byte [color]                        ; Set current color
     mov al, ' '                                 ; Fill with blank spaces
     rep stosw
 
-    mov byte [cs:curX], 0                       ; Reset the cursor X pos to zero
-    mov byte [cs:curY], 0                       ; Reset the cursor Y pos to zero
+    mov byte [curX], 0                          ; Reset the cursor X pos to zero
+    mov byte [curY], 0                          ; Reset the cursor Y pos to zero
 
-    pop di                                      ; Restore registers
+    pop es                                      ; Restore registers
+    pop ds
+    pop di
+    pop si
+    pop dx
     pop cx
+    pop bx
     pop ax
-    pop es
     
     ret
     
@@ -427,12 +468,14 @@ saveScreen:
 ; Returns: Nothing
 ;
 ;---------------------------------------------------
-    push es                                     ; Save registers
-    push ds
-    push ax
+    push ax                                     ; Save registers
+    push bx
     push cx
-    push di
+    push dx
     push si
+    push di
+    push ds
+    push es
 
     cld                                         ; Clear direction flag
     mov si, 0xb800                              ; Video memory segment
@@ -441,17 +484,19 @@ saveScreen:
 
     mov di, cs                                  ; Current segment
     mov es, di
-    lea di, [cs:screen]                         ; Current offset
+    lea di, [screen]                            ; Current offset
     
     mov cx, 80*25                               ; Video resolution
-    rep movsw                                   ; Copy 61 bytes from ds:si to es:di 
+    rep movsw                                   ; Copy from ds:si to es:di 
 
-    pop si                                      ; Restore registers
-    pop di
-    pop cx
-    pop ax
+    pop es                                      ; Restore registers
     pop ds
-    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
     
     ret
     
@@ -465,12 +510,14 @@ restoreScreen:
 ; Returns: Nothing
 ;
 ;---------------------------------------------------
-    push es                                     ; Save registers
-    push ds
-    push ax
+    push ax                                     ; Save registers
+    push bx
     push cx
-    push di
+    push dx
     push si
+    push di
+    push ds
+    push es
 
     cld                                         ; Clear direction flag
     mov di, 0xb800                              ; Video memory segment
@@ -479,17 +526,19 @@ restoreScreen:
 
     mov si, cs                                  ; Current segment
     mov ds, si
-    lea si, [cs:screen]                         ; Current offset
+    lea si, [screen]                            ; Current offset
     
     mov cx, 80*25                               ; Video resolution
     rep movsw                                   ; Copy bytes from ds:si to es:di 
 
-    pop si                                      ; Restore registers
-    pop di
-    pop cx
-    pop ax
+    pop es                                      ; Restore registers
     pop ds
-    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
     
     ret
     
@@ -505,15 +554,20 @@ videoUpdateBiosCur:
 ;---------------------------------------------------
     push bx                                     ; Save registers
     push es
+    push ds
+    
+    mov bx, cs                                  ; Set the data segment to the code segment
+    mov ds, bx                                  ; This is to ensure correct data refrences     
     
     mov bx, 0x40                                ; BIOS memory segment
     mov es, bx
 
-    mov bh, byte [cs:curY]
-    mov bl, byte [cs:curX]
+    mov bh, byte [curY]
+    mov bl, byte [curX]
     mov word [es:0x50], bx
 
-    pop es                                      ; Restore registers
+    pop ds                                      ; Restore registers
+    pop es
     pop bx
 
     ret
@@ -533,13 +587,17 @@ videoUpdateCur:
     push bx
     push cx
     push dx
+    push ds
+    
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences     
 
     xor ah, ah
-    mov al, byte [cs:curY]                      ; Get the Y pos
+    mov al, byte [curY]                         ; Get the Y pos
     mov cl, 80                                  ; Take the cursor Y pos * 80 (cols)
     mul cl                                      ; Multiply ax * cl = ax
     xor ch, ch
-    mov cl, byte [cs:curX]                      ; Get the X pos
+    mov cl, byte [curX]                         ; Get the X pos
     add ax, cx                                  ; Add the cursor X pos
     mov cx, ax                                  ; Move output to the cx register
 
@@ -559,7 +617,8 @@ videoUpdateCur:
     mov dx, 0x03d5                              ; Write into the data register
     out dx, al                                  ; High byte
 
-    pop dx                                      ; Restore registers
+    pop ds                                      ; Restore registers
+    pop dx
     pop cx
     pop bx
     pop ax

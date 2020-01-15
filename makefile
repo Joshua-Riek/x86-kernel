@@ -65,13 +65,17 @@ kernel: $(BINDIR)/kernel.bin
 $(BINDIR)/kernel.bin: $(BINDIR)/kernel.elf
 	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
 
-$(BINDIR)/kernel.elf: $(OBJDIR)/kernel.o
-	mkdir -p $(BINDIR)
+$(BINDIR)/kernel.elf: $(OBJDIR)/kernel.o | $(BINDIR)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm | $(OBJDIR)
-	mkdir -p $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
+
+$(OBJDIR):
+	mkdir -p $@
+
+$(BINDIR):
+	mkdir -p $@
 
 
 # Clean produced files

@@ -17,105 +17,6 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-
-    
-;---------------------------------------------------
-convertFilename83:
-;
-; Converts a 32-bit number and base to a string.
-;
-; Expects: DS:SI = Filename to convert
-;          ES:DI = Converted filename buffer
-;
-; Returns: ES:DI = Updated filename
-;
-;---------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    
-    call strLen                                 ; Get the length of the string in si
-    cmp cx, 0                                   ; See if the string is empty (like my soul)
-    jz .error
-    
-    xor cx, cx                                  ; Handle the first 8 chars
-  .copyFilename:
-    lodsb                                       ; Load the a byte from si
-    call charToUpper
-    or al, al                                   ; Pad out the rest of the string if null
-    jz .padExt
-    cmp al, '.'                                 ; Check for the extension
-    je .extFound
-    stosb                                       ; If not, store it into the tmp string
-    inc cx                                      ; Increase counter
-    cmp cx, 8                                   ; Ensure that their is an extension
-    jg .padExt2
-    jmp .copyFilename
-
-  .extFound:
-    cmp cx, 8                                   ; Check to see if padding is needed
-    je .copyExt
-
-  .padFilename:
-    mov al, ' '
-    stosb                                       ; Store a space into the tmp string
-    inc cx                                      ; Increase the counter
-    cmp cx, 8                                   ; Padd filename untill length of 8
-    jl .padFilename
-
-  .copyExt:
-    lodsb                                       ; Load the extension char
-    call charToUpper                            ; Ensure uppercase
-    or al, al                                   ; See if we need to just pad out the remander
-    jz .padExt
-    stosb                                       ; Store it
-    inc cx                                      ; Loop untill length of 11
-    cmp cx, 11
-    jge .done
-    jmp .copyExt
-
-  .padExt2:
-    dec si                                      ; Go back a byte 
-    dec di                                      ; And check to see if we need to null terminate
-    dec cx
-    cmp byte [si+3], ' '
-    jne .copyExt
-
-    mov byte [di], 0
-    
-  .padExt:
-    mov al, ' '                                 ; Pad with a whitespace
-    stosb                                       ; Store it
-    inc cx                                      ; Continue untill length of 11
-    cmp cx, 11
-    jge .done
-    jmp .padExt
-    
-  .done:
-    mov byte [di], 0
-
-    pop di                                      ; Restore registers
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    
-    ret
-
-  .error:
-    pop di                                      ; Restore registers
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    
-    ret
-
 ;---------------------------------------------------
 itoa:
 ;
@@ -274,6 +175,104 @@ atoi:
     ret
 
   .num dw 0
+      
+;---------------------------------------------------
+convertFilename83:
+;
+;  Convert the filename into a fat formatted
+; filename (8.3 format).
+;
+; Expects: DS:SI = Filename to convert
+;          ES:DI = Converted filename buffer
+;
+; Returns: ES:DI = Updated filename
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    
+    call strLen                                 ; Get the length of the string in si
+    cmp cx, 0                                   ; See if the string is empty (like my soul)
+    jz .error
+    
+    xor cx, cx                                  ; Handle the first 8 chars
+  .copyFilename:
+    lodsb                                       ; Load the a byte from si
+    call charToUpper
+    or al, al                                   ; Pad out the rest of the string if null
+    jz .padExt
+    cmp al, '.'                                 ; Check for the extension
+    je .extFound
+    stosb                                       ; If not, store it into the tmp string
+    inc cx                                      ; Increase counter
+    cmp cx, 8                                   ; Ensure that their is an extension
+    jg .padExt2
+    jmp .copyFilename
+
+  .extFound:
+    cmp cx, 8                                   ; Check to see if padding is needed
+    je .copyExt
+
+  .padFilename:
+    mov al, ' '
+    stosb                                       ; Store a space into the tmp string
+    inc cx                                      ; Increase the counter
+    cmp cx, 8                                   ; Padd filename untill length of 8
+    jl .padFilename
+
+  .copyExt:
+    lodsb                                       ; Load the extension char
+    call charToUpper                            ; Ensure uppercase
+    or al, al                                   ; See if we need to just pad out the remander
+    jz .padExt
+    stosb                                       ; Store it
+    inc cx                                      ; Loop untill length of 11
+    cmp cx, 11
+    jge .done
+    jmp .copyExt
+
+  .padExt2:
+    dec si                                      ; Go back a byte 
+    dec di                                      ; And check to see if we need to null terminate
+    dec cx
+    cmp byte [ds:si+3], ' '
+    jne .copyExt
+
+    mov byte [es:di], 0
+    
+  .padExt:
+    mov al, ' '                                 ; Pad with a whitespace
+    stosb                                       ; Store it
+    inc cx                                      ; Continue untill length of 11
+    cmp cx, 11
+    jge .done
+    jmp .padExt
+    
+  .done:
+    mov byte [es:di], 0
+
+    pop di                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    ret
+
+  .error:
+    pop di                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    ret
     
 ;---------------------------------------------------
 padStr:
@@ -288,7 +287,8 @@ padStr:
 ; Returns: DS:DI = Padded string
 ;
 ;---------------------------------------------------
-    push ax
+    push ax                                     ; Save registers
+    push bx
     push cx
     push dx
     push si
@@ -324,10 +324,11 @@ padStr:
     mov byte [es:di], 0                         ; Null terminate
     inc di
     
-    pop di
+    pop di                                      ; Restore stack
     pop si
     pop dx
     pop cx
+    pop bx
     pop ax
     ret
     
@@ -366,7 +367,7 @@ parseString:
     jc .finish
     
     dec si
-    mov bx, si                                  ; Second string token (BX = "BAR")
+    mov bx, si                                  ; Second string token (BX = "OwO")
     inc si
     
     call findString                             ; Attempt to find text in the string
@@ -384,7 +385,7 @@ parseString:
     jc .finish
     
     dec si
-    mov dx, si                                  ; Fourth string token (DX = "BOO")
+    mov dx, si                                  ; Fourth string token (DX = "UwU")
     inc si
     
     call findString                             ; Attempt to find text in the string
@@ -427,11 +428,11 @@ findSpace:
 ;---------------------------------------------------
 findString:
 ;
-; Find a space in a string.
+; Find the next string.
 ;
 ; Expects: DS:SI = String to parse
 ;
-; Returns: DS:SI = Pointer to found space
+; Returns: DS:SI = Pointer to found string
 ;
 ;---------------------------------------------------
     mov al, byte [ds:si]                        ; Grab a char from the string
@@ -443,7 +444,7 @@ findString:
     cmp al, ' '                                 ; Check for a space
     jne findString
     dec si
-    mov byte [ds:si], 0                         ; Terminate with a string
+    mov byte [ds:si], 0                         ; Terminate with a zero
     inc si
     
     clc
@@ -470,7 +471,7 @@ strCmp:
     push si
     push di
 
-    mov ax, 0
+    xor ax, ax
     mov bx, ax
   .cmp:
     mov al, byte [ds:si]                        ; Byte from si
@@ -563,7 +564,7 @@ charToUpper:
     jng .sub32
 
   .sub32:
-    sub al, 32                                 ; Subtract the number 32 to make the char uppercase
+    sub al, 32                                ; Subtract the number 32 to make the char uppercase
 
   .done:
     ret

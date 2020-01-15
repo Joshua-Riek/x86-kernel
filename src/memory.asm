@@ -40,17 +40,22 @@ setupMemory:
 ; Get the inital low memory and allocate areas
 ; into the memory map.
 ;
-; @param:   None
-; @returns: None
+; Expects: Nothing
+;
+; Returns: Nothing
 ;
 ;---------------------------------------------------
     push ax                                     ; Save registers
     push bx
     push cx
     push dx
-
-    mov cx, cs
-    mov ds, cx
+    push si
+    push di
+    push ds
+    push es
+    
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences     
     
     clc                                         ; Clear carry flag
     int 0x12                                    ; Get Conventional memory size
@@ -61,8 +66,8 @@ setupMemory:
     mul bx                                      ; and multiply, for ammount of blocks
     mov word [loMemMaxBlocks], ax
 
-    mov bx, word [kernelSize]                   ; Get the kernel size
-    add bx, 0x1000                              ; Add the kernel location offset
+    add bx, KERNEL_OFF
+    mov bx, word [kernelSize]                   ; Get the kernel size    
     call memBytesToBlocks                       ; Get the num of blocks to allocate (rounded value)
 
     mov bx, BLOCK_SIZE                          ; Get the block size 
@@ -70,7 +75,7 @@ setupMemory:
 
     mov dx, ax                                  ; Offset for bitmap location
     mov ax, es                                  ; Segment for bitmap location
-    
+
     mov word [loMemMapOff], dx                  ; Save the bitmap location
     mov word [loMemMapSeg], ax
 
@@ -85,21 +90,29 @@ setupMemory:
     jc .error
 
     mov bx, word [kernelSize]                   ; Allocate the kernel into memory
-    mov ax, 0x0000                              ; Segment
-    mov dx, 0x1000                              ; Offset
+    mov ax, es                                  ; Segment
+    mov dx, KERNEL_OFF                          ; Offset
     call allocMemAddress
     jc .error
-
-    pop dx                                      ; Restore registers
+    
+    pop es                                      ; Restore registers
+    pop ds
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
-    
+ 
     clc                                         ; Clear carry, for no error
     ret
     
   .error:
-    pop dx                                      ; Restore registers
+    pop es                                      ; Restore registers
+    pop ds
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
@@ -519,10 +532,9 @@ allocMemAddress:
     mov di, word [loMemMapSeg]                  ; Set segment to memory map location
     mov es, di
     mov di, word [loMemMapOff]                  ; Set offset into memory map
-
     call memAddressToBlock
-
     call memBytesToBlocks
+    
     mov dx, ax                                  ; Size to allocate
     mov ax, cx                                  ; Restore the bitmap index
     
@@ -589,9 +601,3 @@ allocMemAddress:
     stc                                         ; Set carry on error
     ret
 
-    mystring db "Memory Type       Total  =   Used  +   Free ", 10,
-             db "---------------  -------   -------   -------", 10,
-             db "Lower            %6dK   %6dK   %6dK", 10,
-             db "Upper            %6dK   %6dK   %6dK", 10,
-             db "---------------  -------   -------   -------", 10,
-             db "Total Memory", 10, 13, 0
