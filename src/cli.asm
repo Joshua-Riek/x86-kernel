@@ -114,13 +114,15 @@ cliLoop:
     mov si, cmdErase
     call strCmp
     jc doDel
-
-    mov si, cmdNew
-    call strCmp
-    jc doNew
-;    mov si, cmdType                             ; Type
+    
+;    mov si, cmdNew                             ; New
 ;    call strCmp
-;    jc doType
+    ;    jc doNew
+    
+    mov si, cmdType                             ; Type
+    call strCmp
+    jc doType
+
 
 ;    mov si, cmdTime                             ; Time
 ;    call strCmp
@@ -492,7 +494,7 @@ doRename:
 
 
 ;---------------------------------------------------
-doNew:
+doType:
 ;
 ; Command to delete a file.
 ;
@@ -503,42 +505,80 @@ doNew:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-
     push ax                                     ; Save registers
     push bx
     push cx
+    push dx
+    push si
     push di
     push es
+    push ds
     
-    xor dx, dx
+
+    mov dx, 0x2000
     mov es, dx
-    mov di, 0x5600
+    mov di, 0x0
     
-    mov ax, bx
-    call createFile
-    jc .deleteFailure
-      
-    pop es                                      ; Restore registers
+    mov si, bx
+    call readFile
+    jc .readFailure
+    ; size in AX:DX
+    ; counter in BX:CX
+    cmp ax, 0
+    je .done
+    
+    mov cx, ax
+    
+  .readBytes:
+    mov al, byte [es:di]
+    call videoWriteChar
+
+    clc
+    inc di
+    jnc .nextByte 
+
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+    
+  .nextByte:
+    loop .readBytes
+.done:
+        mov al, 0x0a
+    call videoWriteChar                         ; Line feed
+    mov al, 0x0d
+    call videoWriteChar                         ; Newline
+    
+    pop ds                                      ; Restore registers
+    pop es
     pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
-    
+    stc                                         ; Set carry, error occured
     jmp cliLoop
     
-  .deleteFailure:
+  .readFailure:
     push si
     
     mov si, fileNotFoundOrErr                   ; Write out an error message
     call videoWriteStr
     
     pop si
-    
-    pop es                                      ; Restore registers
+    pop ds                                      ; Restore registers
+    pop es
     pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
+
     jmp cliLoop
 
 

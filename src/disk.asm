@@ -51,11 +51,11 @@ bpbBuffer:
     diskBufferSeg     dw 0
     diskBufferOff     dw 0
 
-    rootSeg dw 0
-    rootOff dw 0
+    rootSEG dw 0
+    rootOFF dw 0
 
-    fatSeg dw 0
-    fatOff dw 0
+    fatSEG dw 0
+    fatOFF dw 0
     
 ;---------------------------------------------------
 setupDisk:
@@ -239,10 +239,10 @@ readSectors:
   .readOk:
     pop cx
     pop ax
-    
+
+    clc
     inc ax                                      ; Increase the next sector to read
     add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
-    
     jnc .nextSector 
 
   .fixBuffer:
@@ -309,7 +309,6 @@ writeSectors:
     mov bx, cs                                  ; Ensure corret data segment
     mov ds, bx
     
-    mov dl, byte [drive]                        ; Set correct drive for int 13h
     mov bx, di                                  ; Set disk buffer offset to bx
     
   .sectorLoop:
@@ -317,7 +316,6 @@ writeSectors:
     push cx
 
     push bx                                     ; Save disk buffer offset
-    push dx                                     ; Save drive number
     
     xor dx, dx
     div word [sectorsPerTrack]                  ; Divide the lba (value in ax) by sectorsPerTrack
@@ -337,7 +335,7 @@ writeSectors:
     shl ah, 1
     or cl, ah                                   ; Now cx is set with respective track and sector numbers
  
-    pop dx                                      ; Set correct drive for int 13h
+    mov dl, byte [drive]                        ; Set correct drive for int 13h
     mov dh, bh                                  ; Move the absolute head into dh
     pop bx                                      ; Restore disk buffer offset
     
@@ -359,10 +357,10 @@ writeSectors:
   .readOk:
     pop cx
     pop ax
-    
+
+    clc
     inc ax                                      ; Increase the next sector to read
     add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
-    
     jnc .nextSector 
 
   .fixBuffer:
@@ -428,14 +426,27 @@ readClusters:
     push es
     push ds
 
+    push ds
+    push si
+
+    push es
+    push di
+    
+    pop cx
+    pop bx
+    
+    mov dx, cs
+    mov ds, dx
+
+    mov word [.fatSEG], bx
+    mov word [.fatOFF], cx
+
+    pop di
+    pop es
+ 
   .readCluster:
     push ax                                     ; Save the current cluster
 
-    push es                                     ; Save the data and extra seg to stack
-    push ds 
-    mov dx, cs
-    mov ds, dx
-    
     xor bh, bh
     xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
     sub ax, 2                                   ; Subtract 2
@@ -445,24 +456,21 @@ readClusters:
 
     xor ch, ch
     mov cl, byte [sectorsPerCluster]            ; Sectors to read
-
-    pop es                                      ; Pop them in reverse to switch values
-    pop ds
-    xchg di, si
-
     call readSectors                            ; Read the sectors
     jc .readError
 
-    pop ax                                      ; Restore cluster number
-    push es
-    push ds
+    xor dx, dx                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
+    mov ax, word [sectors]                      ; Take the total sectors subtracted
+    sub ax, word [startOfData]                     ; by the start of the data sectors
+    div bx                                      ; and finally divide 
 
-    xor dx, dx
-;
-;   NOTE: Not sure if this is needed for fat16     
-;   cmp word [totalClusters], 4085              ; Calculate the next FAT12 or FAT16 sector
-    jmp .calculateNextSector12
+    xor dx, dx  
+    mov ax, bx
+    pop ax                                      ; Current cluster number
     
+    cmp bx, 4096                                ; Calculate the next FAT12 or FAT16 sector
+    jle .calculateNextSector12
+
   .calculateNextSector16:                       ; Get the next sector for FAT16 (cluster * 2)
     mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
     mul bx
@@ -476,14 +484,18 @@ readClusters:
     div bx                                      ; Divide the cluster by the denominator
    
   .loadNextSector:
-    pop es
-    pop ds
-    xchg di, si
-
+    push es
     push di
+
+    mov di, word [.fatSEG]
+    mov es, di                                  ; Tempararly set ds:si to the FAT buffer
+    mov di, word [.fatOFF]
+
     add di, ax                                  ; Point to the next cluster in the FAT entry
     mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
+    
     pop di
+    pop es
        
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenSector
@@ -503,14 +515,14 @@ readClusters:
     jae .fileLoaded                             ; Are we at the end of the file?
 
     clc
-    add si, 512                                 ; Add to the buffer address for the next sector
+    add di, 512                                 ; Add to the buffer address for the next sector
     jnc .readCluster 
 
   .fixBuffer:
     push dx                                     ; An error will occur if the buffer in memory
-    mov dx, ds                                  ; overlaps a 64k page boundry, when bx overflows
+    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
-    mov ds, dx                                  ; extra segment by 0x1000
+    mov es, dx                                  ; extra segment by 0x1000
     pop dx
 
     jmp .readCluster
@@ -543,6 +555,9 @@ readClusters:
     stc                                         ; Set carry, error occured
     ret
 
+    .fatSEG dw 0
+    .fatOFF dw 0
+    
 ;--------------------------------------------------
 removeClusters:
 ;
@@ -551,7 +566,6 @@ removeClusters:
 ; based on the starting cluster number.
 ;
 ; Expects: AX    = Starting cluster
-;          ES:DI = Disk buffer
 ;          ES:DI = Location of FAT (MUST BE LOADED INTO MEMORY)
 ;
 ; Returns: CF    = Carry Flag set on error
@@ -573,8 +587,19 @@ removeClusters:
     je .done
     
   .nextCluster:
+    push ax                                     ; Save the current cluster
     xor dx, dx
-    cmp word [totalClusters], 4085              ; Calculate the next FAT12 or FAT16 sector 
+    xor bh, bh
+    mov ax, word [sectors]                      ; Take the total sectors subtracted
+    sub ax, word [startOfData]                  ; by the start of the data sectors
+    mov bl, byte [sectorsPerCluster]
+    div bx                                      ; and finally divide 
+
+    mov ax, bx
+    xor dx, dx  
+    pop ax                                      ; Restore current cluster
+    
+    cmp bx, 4096                                ; Calculate the next FAT12 or FAT16 sector 
     jl .calculateNextSector12
     
   .calculateNextSector16:                       ; Get the next sector for FAT16 (cluster * 2)
@@ -657,7 +682,101 @@ removeClusters:
 
     stc                                         ; Set carry, error occured
     ret
-  
+    
+;--------------------------------------------------
+loadRootDir:
+;
+; This allocates and loads the root dir into memory.
+;
+; Expects: Nothing
+;
+; Returns: ES:DI = Address of root dir
+;          CF    = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push ds
+
+    mov ax, cs                                  ; Ensure correct data segment
+    mov ds, ax
+    
+    call allocRootDir                           ; Allocate the root dir into memory
+    jc .memError
+    
+    call readRootDir                            ; Read the root directory
+    jc .readError
+
+    mov ax, es
+    mov dx, di
+    mov word [rootSEG], ax                      ; Save root segment
+    mov word [rootOFF], dx                      ; Save root offset
+
+    pop ds                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    clc                                         ; Clear carry, for no error
+    ret
+    
+  .readError:
+    call freeRootDir                            ; Free the root dir from memory
+
+  .memError:
+    pop ds                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+
+;--------------------------------------------------
+unloadRootDir:
+;
+; This unallocates the root dir from memory.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov ax, cs                                  ; Ensure correct data segment
+    mov ds, ax
+    
+    mov ax, word [rootSEG]                      ; Get the root segment
+    mov es, ax
+    mov di, word [rootOFF]                      ; Get the root offset
+    call freeRootDir                            ; Free the root dir from memory
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
+    
 ;--------------------------------------------------
 readRootDir:
 ;
@@ -734,6 +853,187 @@ writeRootDir:
     stc                                         ; Set carry, error occured
     ret
     
+;--------------------------------------------------
+allocRootDir:
+;
+; Allocate the root dir into the memory map.
+; NOTE: THIS DOES NOT READ THE ROOT DIR INTO MEMORY.
+;
+; Expects: Nothing
+;
+; Returns: ES:DI = Address of root dir
+;          CF    = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+    
+    xor dx, dx
+    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
+    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    call memBytesToBlocks32
+    
+    call memAllocBlocks                         ; Allocate memory
+    jc .memError                                ; Out of memory
+    
+    mov es, ax
+    mov di, dx
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+      
+    clc                                         ; Clear carry, for no error
+    ret
+
+  .memError:
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+         
+;--------------------------------------------------
+freeRootDir:
+;
+; Free the root dir from use in the memory map.
+;
+; Expects: ES:DI = Address of root dir
+;
+; Returns: Nothing
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+    
+    xor dx, dx
+    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
+    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    call memBytesToBlocks32
+
+    mov ax, es
+    mov dx, di
+    call memFreeBlocks                          ; Free memory
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+      
+    ret
+    
+;--------------------------------------------------
+loadFat:
+;
+; This allocates and loads the FAT into memory.
+;
+; Expects: Nothing
+;
+; Returns: ES:DI = Address of FAT
+;          CF    = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push ds
+
+    mov ax, cs                                  ; Ensure correct data segment
+    mov ds, ax
+    
+    call allocFat                               ; Allocate the FAT into memory
+    jc .memError
+    
+    call readFat                                ; Now read the FAT
+    jc .readError
+
+    mov ax, es
+    mov dx, di
+    mov word [fatSEG], ax                       ; Save root segment
+    mov word [fatOFF], dx                       ; Save root offset
+
+    pop ds                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    clc                                         ; Clear carry, for no error
+    ret
+    
+  .readError:
+    call freeFat                                ; Free the FAT from memory
+
+  .memError:
+    pop ds                                      ; Restore registers
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+
+;--------------------------------------------------
+unloadFat:
+;
+; This unallocates the FAT from memory.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov ax, cs                                  ; Ensure correct data segment
+    mov ds, ax
+    
+    mov ax, word [fatSEG]                       ; Get the FAT segment
+    mov es, ax
+    mov di, word [fatOFF]                       ; Get the FAT offset
+    call freeFat                                ; Free the FAT from memory
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
+    
 ;---------------------------------------------------
 readFat:
 ;
@@ -797,7 +1097,7 @@ writeFat:
 ;
 ; Write the fat im memory to disk.
 ;
-; Expects: ES:DI = Disk buffer
+; Expects: ES:DI = Location of FAT
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -839,93 +1139,6 @@ writeFat:
     pop ax
 
     stc                                         ; Set carry, error occured
-    ret
-
-;--------------------------------------------------
-allocRootDir:
-;
-; Allocate the root dir into the memory map.
-; NOTE: THIS DOES NOT READ THE ROOT DIR INTO MEMORY.
-;
-; Expects: Nothing
-;
-; Returns: ES:DI = Address of root dir
-;          CF    = Carry Flag set on error
-;
-;--------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push ds
-    
-    mov ax, cs
-    mov ds, ax
-    
-    xor dx, dx
-    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
-    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
-    call memBytesToBlocks32
-    
-    call memAllocBlocks                         ; Allocate memory
-    jc .memError                                ; Out of memory
-
-    mov es, ax
-    mov di, dx
-    
-    pop ds                                      ; Restore registers
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-      
-    clc                                         ; Clear carry, for no error
-    ret
-
-  .memError:
-    pop ds                                      ; Restore registers
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-
-    stc                                         ; Set carry, error occured
-    ret
-    
-;--------------------------------------------------
-freeRootDir:
-;
-; Free the root dir from use in the memory map.
-;
-; Expects: ES:DI = Address of root dir
-;
-; Returns: Nothing
-;
-;--------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push ds
-    
-    mov ax, cs
-    mov ds, ax
-    
-    xor dx, dx
-    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
-    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
-    call memBytesToBlocks32
-
-    mov ax, es
-    mov dx, di
-    call memFreeBlocks                          ; Free memory
-    
-    pop ds                                      ; Restore registers
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-      
     ret
 
 ;--------------------------------------------------
@@ -1062,7 +1275,7 @@ searchDir:
     pop si
 
     clc
-    add di, 32                               ; Add 32-11, this points to the next entry 
+    add di, 32                                  ; Add 32, this points to the next entry 
     jnc .nextEntry
     
   .fixBuffer:
@@ -1076,8 +1289,6 @@ searchDir:
     mov cx, dx
     loop .search
     
-    jmp .noFileEntrys
-
   .fileNotFound:     
     pop si                                      ; Restore registers
     pop dx
@@ -1100,6 +1311,74 @@ searchDir:
     ret
 
 ;--------------------------------------------------  
+fileSize:
+; 
+; Search for a file and return its size.
+;
+; Expects: DS:AX = Filename to search for
+;
+; Returns: CF    = Carry Flag set on error
+;
+;--------------------------------------------------  
+    push bx                                     ; Save registers
+    push cx
+    push si
+    push di
+    push es
+    push ds
+
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
+
+    mov si, ax
+    mov di, .tmpName                            ; Output string
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+    
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
+
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .error
+
+    mov si, .tmpName                            ; Search for the file
+    call searchDir
+    jc .fileNotFound
+
+    mov ax, word [di+dirFat.filesize]           ; Get the size of the file
+    mov dx, word [di+dirFat.filesize+2]
+    
+    call unloadRootDir                          ; Free the root dir from memory
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
+    
+    clc                                         ; Clear carry, for no error
+    ret
+
+  .fileNotFound:
+    call unloadRootDir                          ; Free the root dir from memory
+
+  .error:
+    xor ax, ax
+    xor dx, dx
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop cx
+    pop bx
+    
+    stc                                         ; Set carry, error occured
+    ret
+
+ .tmpName times 12 db 0x00
+    
+;--------------------------------------------------  
 fileExists:
 ; 
 ; Load the root dir and search for a file to see
@@ -1119,28 +1398,24 @@ fileExists:
     push es
     push ds
 
-    mov si, ax                                  ; File to find
-    call convertFilename1                       ; Convert filename and format, store in tmpFilename1
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
 
-    mov cx, cs
-    mov ds, cx
-
-    call allocRootDir                           ; Allocate the root dir into memory
-    jc .memError
+    mov si, ax
+    mov di, .tmpName                            ; Output string
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
     
-    call readRootDir                            ; Read the root directory
-    jc .readError
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
 
-    mov bx, es                                  ; Save the current dir offset
-    mov cx, di
-    
-    mov si, tmpFilename1                        ; Search for the file
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .error
+
+    mov si, .tmpName                            ; Search for the file
     call searchDir
     jc .fileNotFound
-
-    mov es, bx                                  ; Set the current dir offset back
-    mov di, cx
-    call freeRootDir                            ; Free the root dir from memory
+    
+    call unloadRootDir                          ; Free the root dir from memory
     
     pop ds                                      ; Restore registers
     pop es
@@ -1155,8 +1430,9 @@ fileExists:
     ret
 
   .fileNotFound:
-  .readError:
-  .memError:
+    call unloadRootDir                          ; Free the root dir from memory
+
+  .error:
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1169,6 +1445,8 @@ fileExists:
     stc                                         ; Set carry, error occured
     ret
 
+  .tmpName times 12 db 0x00
+    
 ;--------------------------------------------------  
 createFile:
 ;
@@ -1191,17 +1469,21 @@ createFile:
     call fileExists                             ; Check to see if the file allready exists
     jnc .existsError                            ; Note: stores/converts filename and loads root dir
 
-    call allocRootDir                           ; Allocate the root dir into memory
-    jc .memError
-    
-    call readRootDir                            ; Read the root directory
-    jc .readError
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
 
+    mov si, ax
+    mov di, .tmpName                            ; Filename
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+    
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
+    
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .error
+    
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
-    
-    mov cx, cs
-    mov ds, cx
 
     mov cx, word [rootDirEntries]
     
@@ -1225,12 +1507,12 @@ createFile:
     pop dx
     
   .nextEntry:
-    loop .search  
+    loop .search
     jmp .noFileEntrys
 
   .freeEntry:
     cld                                         ; Clear direction flag
-    mov si, tmpFilename1                        ; Get the new filename
+    mov si, .tmpName                            ; Get the new filename
     mov cx, 11                                  ; Length of filename
     rep movsb                                   ; Copy bytes from ds:si to es:di 
 
@@ -1255,7 +1537,7 @@ createFile:
     call writeRootDir                           ; Finally, write it to the disk
     jc .writeError
     
-    call freeRootDir                            ; Free the root dir from memory
+    call unloadRootDir                          ; Free the root dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -1269,11 +1551,12 @@ createFile:
     clc                                         ; Clear carry, for no error
     ret
 
-  .existsError:
   .noFileEntrys:
   .writeError:
-  .readError:
-  .memError:
+    call unloadRootDir                          ; Free the root dir from memory
+
+  .error:
+  .existsError:
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1285,7 +1568,9 @@ createFile:
 
     stc                                         ; Set carry, error occured
     ret
- 
+
+  .tmpName times 12 db 0x00
+
 ;--------------------------------------------------  
 renameFile:
 ;
@@ -1300,32 +1585,38 @@ renameFile:
     push ax                                     ; Save registers
     push bx
     push cx
+    push dx
+    push si
+    push di
+    push es
     push ds
-
-    mov si, ax                                  ; File to change
-    call convertFilename1                       ; Convert filename and format, store in tmpFilename1
-
-    mov si, bx                                  ; New filename
-    call convertFilename2                       ; Convert filename and format, store in tmpFilename2
-
-    mov cx, cs
-    mov ds, cx
     
-    call allocRootDir                           ; Allocate the root dir into memory
-    jc .memError
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
+
+    mov si, ax
+    mov di, .tmpName1                           ; Old filename
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+
+    mov si, bx
+    mov di, .tmpName2                           ; New filename 
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
     
-    call readRootDir                            ; Read the root directory
-    jc .readError
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .error
     
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
 
-    mov si, tmpFilename1                        ; Search for the file to rename
+    mov si, .tmpName1                           ; Search for the file to rename
     call searchDir
     jc .fileNotFound
     
     cld                                         ; Clear direction flag
-    mov si, tmpFilename2                        ; Get the new filename
+    mov si, .tmpName2                           ; Get the new filename
     mov cx, 11                                  ; Lenght of filename
     rep movsb                                   ; Copy bytes from ds:si to es:di 
 
@@ -1335,21 +1626,30 @@ renameFile:
     call writeRootDir                           ; Finally, write it to the disk
     jc .writeError
     
-    call freeRootDir                            ; Free the root dir from memory
+    call unloadRootDir                          ; Free the root dir from memory
 
     pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
     
     clc                                         ; Clear carry, for no error
     ret
-
-  .fileNotFound:
-  .readError:
+    
+  .fileNotFound:    
   .writeError:
-  .memError:
+    call unloadRootDir                          ; Free the root dir from memory
+
+  .error:
     pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
@@ -1357,6 +1657,9 @@ renameFile:
     stc                                         ; Set carry, error occured
     ret
     
+  .tmpName1 times 12 db 0x00
+  .tmpName2 times 12 db 0x00
+
 ;--------------------------------------------------  
 deleteFile:
 ;
@@ -1371,218 +1674,191 @@ deleteFile:
     push ax                                     ; Save registers
     push bx
     push cx
+    push dx
+    push si
+    push di
+    push es
     push ds
     
-    mov si, ax                                  ; File to delete
-    call convertFilename1                       ; Convert filename and format, store in tmpFilename1
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
 
-    mov cx, cs
-    mov ds, cx
+    mov si, ax
+    mov di, .tmpName                            ; Filename
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
     
-    call readRootDir                            ; Read the root directory
-    jc .readError
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
     
-    push es                                     ; Save the loaction of the 
-    push di                                     ; loaded data to the stack
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .loadRootError
+    
+    mov bx, es                                  ; Save the current dir offset
+    mov dx, di
 
-    mov si, tmpFilename1                        ; Search for the file to delete
+    mov si, .tmpName                            ; Search for the file to delete
     call searchDir
     jc .fileNotFound
 
-    mov bx, word [di+dirFat.clusterLo]          ; File cluster number
+    mov byte [es:di], 0xe5                      ; Mark file entry as deleted
     mov ax, word [di+dirFat.filesize]           ; Size in bytes of the file
-    mov byte [di], 0xe5                         ; Make file entry as deleted
+    mov cx, word [di+dirFat.clusterLo]          ; File cluster number
 
-    pop di                                      ; Restore root directory location
-    pop es
+    mov es, bx
+    mov di, dx
     
     call writeRootDir                           ; Finally, write it to the disk
-    jc .writeError
+    jc .writeError1
+
+    call unloadRootDir                          ; Free the root dir from memory
 
     cmp ax, 0
     je .done
 
-    call readFat
-    jc .readError
+    call loadFat                                ; Allocate and read the FAT
+    jc .loadFatError
 
-    mov ax, bx
+    mov ax, cx
     call removeClusters
-    jc .writeError
+    jc .writeError2
+    
+    call unloadRootDir                          ; Free the root dir from memory
     
   .done:
     pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
     
     clc                                         ; Clear carry, for no error
     ret
+
+  .writeError2:
+    call unloadFat                              ; Free the Fat from memory
+    jmp .loadFatError
     
   .fileNotFound:
-    pop di                                      ; Cleanup the stack
-    pop es
+  .writeError1:
+    call unloadRootDir                          ; Free the root dir from memory
     
-  .readError:
-  .writeError:
+  .loadRootError:
+  .loadFatError:
     pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
-
     stc                                         ; Set carry, error occured
+    
     ret
+
+  .tmpName times 12 db 0x00
 
 ;--------------------------------------------------  
 readFile:
 ;
 ; Create an empty file in the root directory.
 ;
-; Expects: DS:AX = Filename to create
+; Expects: DS:SI = Filename to read
+;          ES:DI = Location to load file
 ;
-; Returns: CF    = Carry Flag set on error
+; Returns: DS:AX = Filesize
+;             CF = Carry Flag set on error
 ;
 ;--------------------------------------------------  
-    push ax                                     ; Save registers
-    push bx
+    push bx                                     ; Save registers
     push cx
-    push dx
     push si
     push di
     push es
     push ds
 
-    mov si, ax                                  ; File to read
-    call convertFilename1                       ; Convert filename and format, store in tmpFilename1
-
-    mov cx, cs
-    mov ds, cx
+    push es
+    push di
     
-    call readRootDir                            ; Read the root directory
-    jc .readError
-    
-    push es                                     ; Save the loaction of the 
-    push di                                     ; loaded data to the stack
+    mov dx, cs
+    mov es, dx                                  ; Set correct data segment for local var
 
-    mov si, tmpFilename1                        ; Search for the file
+    mov di, .tmpName                            ; Filename
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+ 
+    mov dx, cs
+    mov ds, dx                                  ; Now we refrence .tmpName through ds
+
+    pop word [.loadOFF]
+    pop word [.loadSEG]
+    
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .loadRootError
+    
+    mov bx, es                                  ; Save the current dir offset
+    mov dx, di
+
+    mov si, .tmpName                            ; Search for the file
     call searchDir
     jc .fileNotFound
 
-    mov bx, word [di+dirFat.clusterLo]          ; File cluster number
-    mov ax, word [di+dirFat.filesize]           ; Get the size of the file
+    mov ax, word [di+dirFat.clusterLo]          ; File cluster number
+    mov cx, word [di+dirFat.filesize]           ; Get the size of the file
     mov dx, word [di+dirFat.filesize+2]
 
-    pop di                                      ; Restore root directory location
-    pop es
+    call unloadRootDir                          ; Free the root dir from memory
 
     cmp ax, 0
     je .done
-
-
-    call readFat
-    jc .readError
-
-
-    mov si, 0x1f00
-    mov ds, si
-    mov si, 0x1000-256
     
-    mov ax, bx
+    call loadFat                                ; Allocate and read the FAT
+    jc .loadFatError
+
+    mov si, word [.loadOFF]
+    mov bx, word [.loadSEG]
+    mov ds, bx
+    
     call readClusters
     jc .readError
 
-.done:
+    call unloadFat                              ; Free the FAT from memory
+
+    mov ax, cx
+    
+  .done:
     pop ds                                      ; Restore registers
     pop es
     pop di
     pop si
-    pop dx
     pop cx
     pop bx
-    pop ax
 
     clc                                         ; Clear carry, for no error
     ret
- 
+  
+  .readError:
+    call unloadFat                              ; Free the FAT from memory
+    jmp .loadFatError
     
   .fileNotFound:
-    pop di                                      ; Restore root directory location
-    pop es
-    
-  .noFileEntrys:
-  .readError:
+    call freeRootDir                            ; Free the root dir from memory
+
+  .loadRootError:
+  .loadFatError:
     pop ds                                      ; Restore registers
     pop es
     pop di
     pop si
-    pop dx
     pop cx
     pop bx
-    pop ax
 
     stc                                         ; Set carry, error occured
     ret
- 
-    
-;--------------------------------------------------
-convertFilename1:
-;
-; Convert the filename into a fat formatted filename (8.3 format)
-; then copy it locally for kernel usage.
-;
-; Expects: DS:SI = Filename
-;
-; Returns: Nothing (sets tmpFilename1, for kernel usage)
-;
-;--------------------------------------------------
-    push ax                                     ; Save registers
-    push cx
-    push si
-    push di
-    push es
-    
-    mov cx, cs                                  ; Ensure correct extra segment
-    mov es, cx
 
-    mov di, tmpFilename1                        ; Converted name will go into es:di
-    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
-    pop es                                      ; Restore registers
-    pop di
-    pop si
-    pop cx
-    pop ax
-    ret
-    
-;--------------------------------------------------
-convertFilename2:
-;
-; Convert the filename into a fat formatted filename (8.3 format)
-; then copy it locally for kernel usage.
-;
-; Expects: DS:SI = Filename
-;
-; Returns: Nothing (sets tmpFilename2, for kernel usage)
-;
-;--------------------------------------------------
-    push ax                                     ; Save registers
-    push cx
-    push si
-    push di
-    push es
-    
-    mov cx, cs                                  ; Ensure correct extra segment
-    mov es, cx
-
-    mov di, tmpFilename2                        ; Converted name will go into es:di
-    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
-    pop es                                      ; Restore registers
-    pop di
-    pop si
-    pop cx
-    pop ax
-    ret
-
-
-
+  .loadSEG dw 0
+  .loadOFF dw 0
+  .tmpName times 12 db 0x00
 
