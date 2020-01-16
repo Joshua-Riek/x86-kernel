@@ -1,4 +1,4 @@
-;  bkeyboard.asm
+;  keyboard.asm
 ;
 ;  This file contains simple BIOS keyboard functions.
 ;  Copyright (c) 2017-2020, Joshua Riek
@@ -258,15 +258,20 @@ kbdCaptureInput:
     mov byte [ds:si], 0                         ; Store a null byte into the buffer
     dec cl                                      ; Decrease character counter
 
-    dec byte [cs:curX]
+    push ds
+    push cs
+    pop ds
+    dec byte [curX]
 ;    mov al, 0x08                                ; Write a back space (move cursor X pos back by one)
 ;    call videoWriteChar
     mov al, 0x20                                ; Write a white space
     call videoWriteChar
 ;    mov al, 0x08                                ; Write a back space (move cursor X pos back by one)
 ;    call videoWriteChar
-    dec byte [cs:curX]
+    dec byte [curX]
     call videoUpdateCur
+    pop ds
+    
     jmp .loop
 
   .done:

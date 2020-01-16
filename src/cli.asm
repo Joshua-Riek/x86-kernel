@@ -159,32 +159,8 @@ doDir:
     push bx
     push cx
     push dx
-
-
-   
     
-    ;xor dx, dx
-    ;mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
-    ;mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
-    ;call memBytesToBlocks32
-    
-    ;call memAllocBlocks                         ; Allocate memory
-    ;jc .memError                                ; Out of memory
-;
-    
-    ;xor dx, dx
-    ;xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    ;mov al, byte [fats]                         ; Move number of fats into al
-    ;mul word [fatSectors]                       ; Move fat sectors into bx
-    ;xor dx, dx
-    ;mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector    
-    ;call memBytesToBlocks32
-
-    ;call memAllocBlocks                         ; Allocate memory
-    ;jc .memError
-
-    ; address at AX:DX
-    ; CX
+ 
     
     xor dx, dx
     mov ax, 32
@@ -486,9 +462,6 @@ doRename:
     push di
     push es
 
-    xor dx, dx
-    mov es, dx
-    mov di, 0x5600
     
     mov ax, bx
     mov bx, cx
@@ -542,7 +515,7 @@ doNew:
     mov di, 0x5600
     
     mov ax, bx
-    call readFile
+    call createFile
     jc .deleteFailure
       
     pop es                                      ; Restore registers

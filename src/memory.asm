@@ -66,8 +66,8 @@ setupMemory:
     mul bx                                      ; and multiply, for ammount of blocks
     mov word [loMemMaxBlocks], ax
 
-    add bx, KERNEL_OFF
     mov bx, word [kernelSize]                   ; Get the kernel size    
+    add bx, KERNEL_OFF
     call memBytesToBlocks                       ; Get the num of blocks to allocate (rounded value)
 
     mov bx, BLOCK_SIZE                          ; Get the block size 

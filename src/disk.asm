@@ -15,7 +15,7 @@
 ;
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-    ;
+;
 
 bpbBuffer:
     bootJump          times 3 db 0              ; Jump instruction over the OEM / BIOS param block
@@ -50,6 +50,13 @@ bpbBuffer:
 
     diskBufferSeg     dw 0
     diskBufferOff     dw 0
+
+    rootSeg dw 0
+    rootOff dw 0
+
+    fatSeg dw 0
+    fatOff dw 0
+    
 ;---------------------------------------------------
 setupDisk:
 ;
@@ -833,6 +840,187 @@ writeFat:
 
     stc                                         ; Set carry, error occured
     ret
+
+;--------------------------------------------------
+allocRootDir:
+;
+; Allocate the root dir into the memory map.
+; NOTE: THIS DOES NOT READ THE ROOT DIR INTO MEMORY.
+;
+; Expects: Nothing
+;
+; Returns: ES:DI = Address of root dir
+;          CF    = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+    
+    xor dx, dx
+    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
+    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    call memBytesToBlocks32
+    
+    call memAllocBlocks                         ; Allocate memory
+    jc .memError                                ; Out of memory
+
+    mov es, ax
+    mov di, dx
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+      
+    clc                                         ; Clear carry, for no error
+    ret
+
+  .memError:
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+    
+;--------------------------------------------------
+freeRootDir:
+;
+; Free the root dir from use in the memory map.
+;
+; Expects: ES:DI = Address of root dir
+;
+; Returns: Nothing
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+    
+    xor dx, dx
+    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
+    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    call memBytesToBlocks32
+
+    mov ax, es
+    mov dx, di
+    call memFreeBlocks                          ; Free memory
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+      
+    ret
+
+;--------------------------------------------------
+allocFat:    
+;
+; Allocate the FAT into the memory map.
+; NOTE: THIS DOES NOT READ FAT INTO MEMORY.
+;
+; Expects: Nothing
+;
+; Returns: ES:DI = Address of FAT
+;          CF    = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+
+    xor dx, dx
+    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
+    mov al, byte [fats]                         ; Move number of fats into al
+    mul word [fatSectors]                       ; Move fat sectors into bx
+    xor dx, dx
+    mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector    
+    call memBytesToBlocks32
+
+    call memAllocBlocks                         ; Allocate memory
+    jc .memError
+
+    mov es, ax
+    mov di, dx
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+      
+    clc                                         ; Clear carry, for no error
+    ret
+
+  .memError:
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+    
+;--------------------------------------------------
+freeFat:    
+;
+; Allocate the FAT into the memory map.
+; NOTE: THIS DOES NOT READ FAT INTO MEMORY.
+;
+; Expects: ES:DI = Address of FAT
+;
+; Returns: Nothing
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push ds
+    
+    mov ax, cs
+    mov ds, ax
+
+    xor dx, dx
+    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
+    mov al, byte [fats]                         ; Move number of fats into al
+    mul word [fatSectors]                       ; Move fat sectors into bx
+    xor dx, dx
+    mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector    
+    call memBytesToBlocks32
+
+    mov ax, es
+    mov dx, di
+    call memFreeBlocks                          ; Free memory
+    
+    pop ds                                      ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
     
 ;--------------------------------------------------
 searchDir:
@@ -849,20 +1037,20 @@ searchDir:
 ;--------------------------------------------------
     push ax
     push cx
+    push dx
     push si
 
     push ds
-    
     mov cx, cs
     mov ds, cx
-    mov cx, word [rootDirEntries]
 
+    mov cx, word [rootDirEntries]
     pop ds
     
   .search:
-    xchg cx, dx
+    mov dx, cx
 
-    push si                                     ; Save filename offset
+    push si
     push di
     
     cld                                         ; Clear direction flag
@@ -871,14 +1059,28 @@ searchDir:
     je .fileFound                               ; We found the file :)
 
     pop di
-    pop si                                      ; Restore filename offset
+    pop si
+
+    clc
+    add di, 32                               ; Add 32-11, this points to the next entry 
+    jnc .nextEntry
     
-    add di, 32
-    xchg dx, cx
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+    
+  .nextEntry:
+    mov cx, dx
     loop .search
+    
+    jmp .noFileEntrys
 
   .fileNotFound:     
     pop si                                      ; Restore registers
+    pop dx
     pop cx
     pop ax
     
@@ -886,10 +1088,11 @@ searchDir:
     ret
 
   .fileFound:
-    pop di                                      ; Restore registers
+    pop di
     pop si
     
-    pop si
+    pop si                                      ; Restore registers
+    pop dx
     pop cx
     pop ax
     
@@ -921,14 +1124,24 @@ fileExists:
 
     mov cx, cs
     mov ds, cx
+
+    call allocRootDir                           ; Allocate the root dir into memory
+    jc .memError
     
     call readRootDir                            ; Read the root directory
     jc .readError
 
+    mov bx, es                                  ; Save the current dir offset
+    mov cx, di
+    
     mov si, tmpFilename1                        ; Search for the file
     call searchDir
     jc .fileNotFound
 
+    mov es, bx                                  ; Set the current dir offset back
+    mov di, cx
+    call freeRootDir                            ; Free the root dir from memory
+    
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -941,8 +1154,9 @@ fileExists:
     clc                                         ; Clear carry, for no error
     ret
 
-  .fileNotFound:    
+  .fileNotFound:
   .readError:
+  .memError:
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -976,10 +1190,16 @@ createFile:
 
     call fileExists                             ; Check to see if the file allready exists
     jnc .existsError                            ; Note: stores/converts filename and loads root dir
-    
-    push es                                     ; Save the loaction of the 
-    push di                                     ; loaded data to the stack
 
+    call allocRootDir                           ; Allocate the root dir into memory
+    jc .memError
+    
+    call readRootDir                            ; Read the root directory
+    jc .readError
+
+    mov bx, es                                  ; Save the current dir offset
+    mov dx, di
+    
     mov cx, cs
     mov ds, cx
 
@@ -992,13 +1212,20 @@ createFile:
     je .freeEntry
     cmp al, 0xe5                                ; Free entry marker
     je .freeEntry
-    
-    add di, 32                                  ; Point to the next entry
-    loop .search
 
-    pop di
-    pop es
+    clc
+    add di, 32                                  ; Point to the next entry
+    jnc .nextEntry
     
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+    
+  .nextEntry:
+    loop .search  
     jmp .noFileEntrys
 
   .freeEntry:
@@ -1022,11 +1249,13 @@ createFile:
     mov word [di+dirFat.filesize],     0        ; Size of the file
     mov word [di+dirFat.filesize+2],   0        ; 
 
-    pop di
-    pop es
+    mov es, bx
+    mov di, dx
     
     call writeRootDir                           ; Finally, write it to the disk
     jc .writeError
+    
+    call freeRootDir                            ; Free the root dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -1043,6 +1272,8 @@ createFile:
   .existsError:
   .noFileEntrys:
   .writeError:
+  .readError:
+  .memError:
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1080,11 +1311,14 @@ renameFile:
     mov cx, cs
     mov ds, cx
     
+    call allocRootDir                           ; Allocate the root dir into memory
+    jc .memError
+    
     call readRootDir                            ; Read the root directory
     jc .readError
     
-    push es                                     ; Save the loaction of the 
-    push di                                     ; loaded data to the stack
+    mov bx, es                                  ; Save the current dir offset
+    mov dx, di
 
     mov si, tmpFilename1                        ; Search for the file to rename
     call searchDir
@@ -1095,11 +1329,13 @@ renameFile:
     mov cx, 11                                  ; Lenght of filename
     rep movsb                                   ; Copy bytes from ds:si to es:di 
 
-    pop di                                      ; Restore root directory location
-    pop es
-    
+    mov es, bx                                  ; Set the current dir offset back
+    mov di, dx
+  
     call writeRootDir                           ; Finally, write it to the disk
     jc .writeError
+    
+    call freeRootDir                            ; Free the root dir from memory
 
     pop ds                                      ; Restore registers
     pop cx
@@ -1110,11 +1346,9 @@ renameFile:
     ret
 
   .fileNotFound:
-    pop di                                      ; Cleanup the stack
-    pop es
-    
   .readError:
   .writeError:
+  .memError:
     pop ds                                      ; Restore registers
     pop cx
     pop bx
