@@ -67,6 +67,40 @@ entryPoint:
     call setupDisk                              ; Setup the disk manager
     jc .diskError
 
+    push ax
+    push bx
+    push cx
+    push dx
+    push ds
+    push es
+    push si
+    push di
+
+
+    call driveGets
+    mov di, 0x2000
+    mov es, di
+    mov di, 0x0
+
+
+    
+    mov si, foos
+    call readFile
+    
+    ;jc .readFailure
+
+    mov si, fo0s
+    call writeFile
+
+        pop di
+    pop si
+    pop es
+    pop ds
+    pop dx
+    pop cx
+    pop cx
+    pop bx
+    pop ax
     jmp cliLoop                                 ; Go to the user command line
     
   .hang:
@@ -127,4 +161,127 @@ __GPL_WARRANTY  db "This program is distributed in the hope that it will be usef
                 db "but WITHOUT ANY WARRANTY; without even the implied warranty of", 10, 13,
                 db "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the", 10, 13,
                 db "GNU General Public License for more details.", 10, 13, 0
+    foos db "HAMLET  TXT"
+    fo0s db "FOO     TXT"
+driveGets:
+
     
+    mov bx, 16
+    mov cl, 0
+    mov ch, 0
+
+    mov si, _1
+    call videoWriteStr
+    mov ax, word [bytesPerSector]
+    mov dx, 0
+    call videoWriteNumPadding32
+    
+    mov si, _2
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [sectorsPerCluster]
+    mov dx, 0
+    call videoWriteNumPadding32
+    
+    mov si, _3
+    call videoWriteStr
+    mov ax, word [reservedSectors]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _4
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [fats]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _5
+    call videoWriteStr
+    mov ax, word [rootDirEntries]
+    mov dx, 0
+    call videoWriteNumPadding32
+    
+    mov si, _6
+    call videoWriteStr
+    mov ax, word [sectors]
+    mov dx, 0
+    call videoWriteNumPadding32
+    
+    mov si, _7
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [mediaType]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _8
+    call videoWriteStr
+    mov ax, word [fatSectors]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _9
+    call videoWriteStr
+    mov ax, word [sectorsPerTrack]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _10
+    call videoWriteStr
+    mov ax, word [heads]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _11
+    call videoWriteStr
+    mov ax, word [hiddenSectors]
+    mov dx, word [hiddenSectors+2]
+    call videoWriteNumPadding32
+    
+    mov si, _12
+    call videoWriteStr
+    mov ax, word [hugeSectors]
+    mov dx, word [hugeSectors+2]
+    call videoWriteNumPadding32
+
+    mov si, _13
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [driveNum]
+    mov dx, 0
+    call videoWriteNumPadding32    
+
+    mov si, _14
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [reserved]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    mov si, _15
+    call videoWriteStr
+    xor ah, ah
+    mov al, byte [bootSignature]
+    mov dx, 0
+    call videoWriteNumPadding32
+
+    ret
+    
+
+_1 db  10, 13, "bytesPerSector: ", 0                         ; dw
+_2 db  10, 13, "sectorsPerCluster: ", 0                      ; db
+_3 db  10, 13, "reservedSectors: ", 0                        ; dw
+_4 db  10, 13, "fats: ", 0                                   ; db
+_5 db  10, 13, "rootDirEntries: ", 0                         ; dw
+_6 db  10, 13, "sectors: ", 0                                ; dw
+_7 db  10, 13, "mediaType: ", 0                              ; db
+_8 db  10, 13, "fatSectors: ", 0                             ; dw
+_9 db  10, 13, "sectorsPerTrack: ", 0                        ; dw
+_10 db 10, 13, "heads: ", 0                                  ; dw
+_11 db 10, 13, "hiddenSectors: ", 0                          ; dd
+_12 db 10, 13, "hugeSectors: ", 0                            ; dd
+_13 db 10, 13, "driveNum: ", 0                               ; db
+_14 db 10, 13, "reserved: ", 0                               ; db
+_15 db 10, 13, "bootSignature: ", 0                          ; db
+ 

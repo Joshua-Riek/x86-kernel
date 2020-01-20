@@ -29,7 +29,8 @@
     dayOfWeek         db "Sun ", 0, "Mon ", 0, "Tue ", 0,
                       db "Wed ", 0, "Thu ", 0, "Fri ", 0,
                       db "Sat ", 0
-    
+
+    cmdCopy           db "COPY", 0
     cmdDir            db "DIR", 0
     cmdRename         db "RENAME", 0
     cmdRen            db "REN", 0
@@ -92,9 +93,13 @@ cliLoop:
     mov di, si
 
   .parseCommands:
-    cmp al, 0                                   ; Do nothing if input empty
-    je .displayPrompt
+    ;cmp al, 0                                   ; Do nothing if input empty
+    ;je .displayPrompt
 
+    mov si, cmdCopy
+    call strCmp
+    jc doCopy
+    
     mov si, cmdDir
     call strCmp
     jc doDir
@@ -465,8 +470,8 @@ doRename:
     push es
 
     
-    mov ax, bx
-    mov bx, cx
+    mov si, bx
+    mov di, cx
     call renameFile
     jc .renameFailure
       
@@ -492,7 +497,59 @@ doRename:
     pop ax
     jmp cliLoop
 
+doCopy:
+    
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+    
 
+    mov dx, 0x2000
+    mov es, dx
+    mov di, 0x0
+    
+    mov si, bx
+    call readFile
+    jc .readFailure
+
+    mov si, cx
+    call writeFile
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    stc                                         ; Set carry, error occured
+    jmp cliLoop
+    
+  .readFailure:
+    push si
+    
+    mov si, fileNotFoundOrErr                   ; Write out an error message
+    call videoWriteStr
+    
+    pop si
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
 ;---------------------------------------------------
 doType:
 ;
@@ -522,6 +579,7 @@ doType:
     mov si, bx
     call readFile
     jc .readFailure
+
     ; size in AX:DX
     ; counter in BX:CX
     cmp ax, 0
@@ -534,7 +592,7 @@ doType:
     call videoWriteChar
 
     clc
-    inc di
+    add di, 1
     jnc .nextByte 
 
   .fixBuffer:
@@ -544,8 +602,22 @@ doType:
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
     
-  .nextByte:
-    loop .readBytes
+.nextByte:
+    dec cx
+    cmp cx, 0
+    jne .readBytes
+
+    cmp dx, 0
+    je .done
+
+    sub dx, 1
+
+
+    
+    mov cx, 0xffff
+    jmp .nextByte
+
+    
 .done:
         mov al, 0x0a
     call videoWriteChar                         ; Line feed

@@ -25,7 +25,7 @@ OBJCOPY      ?= objcopy
 DD           ?= dd
 
 # Other tools
-QEMU         ?= "D:/qemu/qemu-system-i386"
+QEMU         ?= qemu-system-i386
 
 # Output directory
 SRCDIR        = ./src
@@ -52,7 +52,7 @@ endif
 
 
 # Set phony targets
-.PHONY: all clean clobber kernel kernel-install kernel-debug kernel-run
+.PHONY: all clean clobber kernel install debug run
 
 
 # Rule to make targets
@@ -72,10 +72,10 @@ $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm | $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
 
 $(OBJDIR):
-	mkdir -p $@
+	@mkdir -p $@
 
 $(BINDIR):
-	mkdir -p $@
+	@mkdir -p $@
 
 
 # Clean produced files
@@ -88,20 +88,25 @@ clobber: clean
 
 
 # Write the kernel to a disk image
-kernel-install:
+install:
+	cp "big clust copy.img" $(DISKIMG)
+
 	imdisk -a -f $(DISKIMG) -m B:
 #   Fix for error "cp: cannot create regular file"
 #   mount B: \b
 	cp $(BINDIR)/kernel.bin B:/kernel.bin
 	imdisk -D -m B:
-
+#	$(QEMU) -fda $(DISKIMG)
+#	imdisk -a -f $(DISKIMG) -m B:
+#	start B:\FOO.TXT
+#	imdisk -D -m B:
 
 # Run the disk image
-kernel-run:
+run:
 	$(QEMU) -fda $(DISKIMG)
 
 
 # Start a debug session with qemu
-kernel-debug:
+debug:
 	$(QEMU) -S -s -fda $(DISKIMG)
 

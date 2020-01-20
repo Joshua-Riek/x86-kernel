@@ -44,6 +44,7 @@ bpbBuffer:
     startOfData       dw 0
     totalClusters     dw 0
     sectorsPerFat     dw 0
+    bytesPerCluster   dw 0
     drive db 0
     tmpFilename1 times 12 db 0
     tmpFilename2 times 12 db 0
@@ -136,7 +137,13 @@ setupDisk:
     sub bx, word [cs:startOfData]               ; by the start of the data sectors
     div word [cs:sectorsPerCluster]             ; Now divide by the sectors per cluster
     mov word [cs:totalClusters], ax
-    
+
+    xor dx, dx
+    mov ax, word [bytesPerSector]
+    mov bl, byte [sectorsPerCluster]
+    xor bh, bh
+    mul bx
+    mov word [bytesPerCluster], ax
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -461,9 +468,9 @@ readClusters:
 
     xor dx, dx                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
     mov ax, word [sectors]                      ; Take the total sectors subtracted
-    sub ax, word [startOfData]                     ; by the start of the data sectors
+    sub ax, word [startOfData]                  ; by the start of the data sectors
     div bx                                      ; and finally divide 
-
+    
     xor dx, dx  
     mov ax, bx
     pop ax                                      ; Current cluster number
@@ -515,7 +522,7 @@ readClusters:
     jae .fileLoaded                             ; Are we at the end of the file?
 
     clc
-    add di, 512                                 ; Add to the buffer address for the next sector
+    add di, word [bytesPerCluster]              ; Add to the buffer address for the next cluster
     jnc .readCluster 
 
   .fixBuffer:
@@ -1315,9 +1322,10 @@ fileSize:
 ; 
 ; Search for a file and return its size.
 ;
-; Expects: DS:AX = Filename to search for
+; Expects: DS:SI = Filename to search for
 ;
-; Returns: CF    = Carry Flag set on error
+; Returns: AX:DX = Filesize
+;          CF    = Carry Flag set on error
 ;
 ;--------------------------------------------------  
     push bx                                     ; Save registers
@@ -1384,7 +1392,7 @@ fileExists:
 ; Load the root dir and search for a file to see
 ; if it exists.
 ;
-; Expects: DS:AX = Filename to search for
+; Expects: DS:SI = Filename to search for
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1401,7 +1409,6 @@ fileExists:
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
-    mov si, ax
     mov di, .tmpName                            ; Output string
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
     
@@ -1452,7 +1459,7 @@ createFile:
 ;
 ; Create an empty file in the root directory.
 ;
-; Expects: DS:AX = Filename to create
+; Expects: DS:SI = Filename to create
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1472,7 +1479,6 @@ createFile:
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
-    mov si, ax
     mov di, .tmpName                            ; Filename
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
     
@@ -1576,8 +1582,8 @@ renameFile:
 ;
 ; Rename a file in the root directory.
 ;
-; Expects: DS:AX = Filename to change
-;          DS:BX = New filename
+; Expects: DS:SI = Filename to change
+;          DS:DI = New filename
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1594,11 +1600,11 @@ renameFile:
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
-    mov si, ax
+    push di
     mov di, .tmpName1                           ; Old filename
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
 
-    mov si, bx
+    pop si
     mov di, .tmpName2                           ; New filename 
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
 
@@ -1683,7 +1689,6 @@ deleteFile:
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
-    mov si, ax
     mov di, .tmpName                            ; Filename
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
     
@@ -1862,3 +1867,391 @@ readFile:
   .loadOFF dw 0
   .tmpName times 12 db 0x00
 
+;--------------------------------------------------  
+writeFile:
+;
+; Create an empty file in the root directory.
+;
+; Expects: DS:SI = Filename to read
+;          ES:DI = Location of data
+;          DX:AX = Filesize
+;
+; Returns:    CF = Carry Flag set on error
+;
+;--------------------------------------------------  
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    push es
+    push di
+    
+    mov cx, cs
+    mov es, cx                                  ; Set correct data segment for local var
+
+    mov di, .tmpName                            ; Filename
+    call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
+ 
+    mov cx, cs
+    mov ds, cx                                  ; Now we refrence .tmpName through ds
+
+    pop word [.loadOFF]
+    pop word [.loadSEG]
+    mov word [.loFilesize], ax                  ; Save the lo word of the filesize
+    mov word [.hiFilesize], dx                  ; Save the hi word of the filesize
+    
+    mov si, .tmpName
+    call fileExists                             ; Do not overwrite a file if it exists!
+    jc .fileExistsError
+
+    mov si, .freeClusters
+    mov cx, 512
+    
+  .zeroClusterLoop:                             ; Just to make sure no other clusters
+    mov word [ds:si], 0                         ; are left over on further calls of
+    inc si                                      ; this function
+    inc si
+    loop .zeroClusterLoop
+
+    mov cx, ax                                  ; Calculate how many clusters are required
+    mov ax, dx
+    mov bx, word [bytesPerCluster]              ; First take the hi word of the 32-bit filesize
+    xor dx, dx                                  ; Divide by bytes per cluster
+    div bx
+    xchg ax, cx                                 ; Now take the lo word of the 32-bit filesize
+    div bx                                      ; Divide again by bytes per cluster
+    or dx, dx
+    jz .loadFat                                 ; Add one if remander 
+    inc ax
+    
+  .loadFat:
+    mov word [.clustersNeeded], ax
+    mov dx, ax
+
+    mov si, .tmpName 
+    call createFile                             ; Create the file to write
+    jc .createFileError
+
+    cmp dx, 0                                   ; If no clusters are needed, do nothing
+    je .fileZero
+    
+    call loadFat                                ; Allocate and read the FAT
+    jc .loadFatError
+
+    push es
+    push di
+    
+    add di, 3                                   ; Skip the fist two clusters
+    mov bx, 2                                   ; Current cluster counter
+    mov cx, word [.clustersNeeded]              ; Clusters needed
+    mov dx, 0                                   ; Offset into free cluster list
+
+  .findFreeCluster:
+    mov ax, word [es:di]                        ; Grab the next word in FAT
+    inc di
+    inc di
+
+    and ax, 0x0fff                              ; Mask out for even cluster
+    jz .foundFreeEven                           ; If zero, entry is free 
+
+  .moreOdd:
+    inc bx                                      ; If not free, increase cluster counter
+    dec di                                      ; Decrease counter byte in FAT
+
+    mov ax, word [es:di]                        ; Grab the next word in FAT
+    inc di
+    inc di
+    
+    shr ax, 1                                   ; Shift out for odd cluster
+    shr ax, 1
+    shr ax, 1
+    shr ax, 1
+    or ax, ax
+    jz .foundFreeOdd                            ; If zero, entry is free
+
+  .moreEven:
+    inc bx                                      ; If not free, increase cluster clounter
+    jmp .findFreeCluster
+
+  .foundFreeEven:
+    push si
+    mov si, .freeClusters
+    add si, dx                                  ; Offset into free cluster list
+    mov word [ds:si], bx                        ; Put the cluster into the list
+    pop si
+
+    dec cx                                      ; Check to see if we have all the clusters needed
+    cmp cx, 0
+    je .freeClustersFound
+
+    inc dx                                      ; If not, continute to next cluster 
+    inc dx
+    jmp .moreOdd
+    
+  .foundFreeOdd:
+    push si
+    mov si, .freeClusters
+    add si, dx                                  ; Offset into free cluster list
+    mov word [ds:si], bx                        ; Put the cluster into the list
+    pop si
+
+    dec cx                                      ; Check to see if we have all the clusters needed
+    cmp cx, 0
+    je .freeClustersFound
+
+    inc dx                                      ; If not, continute to next cluster 
+    inc dx
+    jmp .moreEven
+
+  .freeClustersFound:
+    mov si, .freeClusters
+    mov cx, 0
+    mov word [.count], 1
+
+    pop di
+    pop es
+    
+  .chainClusterLoop:                            ; Now we must begin to write the cluster
+    mov si, .freeClusters                       ; chain into FAT
+    add si, cx
+    mov bx, word [ds:si]
+
+    push bx                                     ; First, calculate total fat clusers, so
+    xor bh, bh                                  ; we know to use FAT12 or FAT16
+    xor dx, dx
+    mov ax, word [sectors]                      ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
+    sub ax, word [startOfData]                  ; Take the total sectors subtracted
+    mov bl, byte [sectorsPerCluster]            ; by the start of the data sectors
+    div bx                                      ; and finally divide 
+
+    xor dx, dx  
+    mov ax, bx                                  ; Total cluster number
+    pop ax                                      ; Current cluster number
+    
+    cmp bx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
+    jle .calculateNextCluster12
+
+  .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
+    mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
+    mul bx
+
+    jmp .loadNextCluster
+    
+  .calculateNextCluster12:                      ; Get the next cluster for FAT12 (cluster + (cluster * 1.5))
+    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    mul bx                                      ; Multiply the cluster by the numerator
+    mov bx, 2                                   ; Return value in ax and remainder in dx
+    div bx                                      ; Divide the cluster by the denominator
+   
+  .loadNextCluster:
+    push es                                     ; Save the current position in memory 
+    push di                                     ; For es:di contains the FAT location
+                                                ; I wrote a small check to correct potental overlapping
+    clc
+    add di, ax                                  ; Point to the next cluster in the FAT entry
+    jnc .loadNextCluster2
+    
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+
+  .loadNextCluster2:  
+    mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
+    mov bx, word [.count]                       ; Check here to see if we have all the
+    cmp bx, word [.clustersNeeded]              ; clusters we need to allocate
+    je .lastCluster
+
+    or dx, dx                                   ; Is the cluster caluclated even?
+    jz .evenCluster
+    
+  .oddCluster:       
+    mov si, .freeClusters                       ; chain into FAT
+    add si, cx
+
+    and ax, 0x000f                              ; Zero out the bits for the next cluster
+    mov bx, word [ds:si+2]                      ; Get the NEXT cluster
+    shl bx, 1                                   ; Shift left for correct FAT cluster format
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    add ax, bx
+    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT
+    pop di
+    pop es
+
+    inc word [.count]
+    inc cx
+    inc cx
+    jmp .chainClusterLoop
+
+  .evenCluster:
+    mov si, .freeClusters                       ; chain into FAT
+    add si, cx
+
+    and ax, 0xf000                              ; Zero out the bits for the next cluster
+    mov bx, word [ds:si+2]                      ; Get the NEXT cluster
+    add ax, bx
+    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT
+    pop di
+    pop es
+
+    inc word [.count]
+    inc cx
+    inc cx
+    jmp .chainClusterLoop
+    
+  .lastCluster:
+    or dx, dx                                   ; Double check to see if the last cluster
+    jz .evenLast                                ; is even or odd
+
+  .oddLast:
+    and ax, 0x000f
+    add ax, 0xff80
+    jmp .chainDone
+    
+  .evenLast:
+    and ax, 0xf000
+    add ax, 0xff8
+    
+  .chainDone:
+    mov word [es:di], ax                        ; Finally store the last cluster into FAT
+    pop di
+    pop es
+
+    call writeFat                               ; Then write the new FAT data to the disk 
+    jc .writeFatError
+    
+    call unloadFat                              ; Kiss that FAT ass goodbye and unallocate it from mem
+
+    mov di, word [.loadSEG]
+    mov es, di                                  ; Set es:di to the file's data, so we may
+    mov di, word [.loadOFF]                     ; write that aswell onto the disk
+    mov cx, 0
+
+  .saveLoop:
+    mov si, .freeClusters
+    add si, cx                                  ; Get the free fat cluster according to the offset
+    mov ax, word [ds:si]                        ; Grab the next word in FAT
+    
+    cmp ax, 0                                   ; Check for the last cluster to write
+    je .fileSaved
+
+    push ax                                     ; Current cluster
+    push cx                                     ; Offset into free clusters
+
+    xor ch, ch
+    xor bh, bh
+    xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
+    sub ax, 2                                   ; Subtract 2
+    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
+    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
+    add ax, word [startOfData]                  ; Add the userData 
+    mov cl, byte [sectorsPerCluster]            ; Sectors to read
+    call writeSectors
+    jc .writeSectorsError
+
+    
+    pop cx
+    pop ax
+    
+    clc
+    add di, word [bytesPerCluster]              ; Point to the next portion of data to write
+    jnc .saveLoop2
+    
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+
+  .saveLoop2:        
+    inc cx
+    inc cx
+    jmp .saveLoop
+    
+  .fileSaved:
+    call loadRootDir                            ; Allocate and read the root dir
+    jc .loadRootError
+    
+    mov bx, es                                  ; Save the current dir offset
+    mov dx, di
+
+    mov si, .tmpName                            ; Search for the file to rename
+    call searchDir
+
+    push dx
+    mov cx, word [.freeClusters]
+    mov ax, word [.loFilesize]
+    mov dx, word [.hiFilesize]
+
+    mov word [di+dirFat.clusterLo], cx
+    mov word [di+dirFat.filesize], ax
+    mov word [di+dirFat.filesize+2], dx
+    pop dx
+    
+    mov es, bx
+    mov di, dx
+    
+    call writeRootDir                           ; Finally, write it to the disk
+    jc .writeRootError
+    
+    call unloadRootDir                          ; Free the root dir from memory
+
+  .fileZero:   
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    clc                                         ; Clear carry, for no error
+    ret
+
+  .writeFatError:                               ; Error, unable to write the new fat to the disk
+    call unloadFat                              ; But was able to create a newfile entry
+    jmp .error
+
+  .writeSectorsError:                           ; Was able to write FAT and a newfile entry
+    pop cx                                      ; But, error on writing clusters to disk
+    pop ax
+    jmp .error
+    
+  .writeRootError:
+    call unloadRootDir                          ; Free the root dir from memory
+    
+.fileExistsError:
+.createFileError:
+.loadFatError:
+.loadRootError:                               ; W FAT, W NEWFILE, W CLUSTERS
+
+.error:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    stc                                         ; Set carry, error occured
+    ret
+
+    .count dw 0
+    .loadSEG dw 0
+    .loadOFF dw 0
+    .loFilesize dw 0
+    .hiFilesize dw 0
+    .tmpName times 12 db 0x00
+    .clustersNeeded dw 0
+  .freeClusters times 512 dw 0
