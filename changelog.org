@@ -1,0 +1,153 @@
+#+STARTUP: indent 
+#+TODO: TODO | DONE | FIXME | CANCELED | CHANGELOG
+#+STARTUP: logdone showall
+
+* CHANGELOG 0.1.0 
+- Function *videoWriteNumPadding32* to write and pad 32-bit numbers (by base) into video memory.   
+- Function *videoWriteNumPadding* to write and pad numbers (by base) into video memory.   
+- Function *videoClearScreen* to clear the screen.
+- Function *videoWriteChar* to write a character into video memory.
+- Function *videoWriteStr* to write strings into video memory.
+- Function *videoWriteNum* to write numbers (by base) into video memory.
+- Function *videoUpdateCur* to update the hardware cursor.
+- Function *restoreScreen* to restore screen contents from memory.
+- Function *saveScreen* to save the screen contents into memory.
+- Function *setupVideo* to grab the cursor pos from bios and save it for use.
+
+* CHANGELOG 0.1.1
+- Function *videoScroll* added to support scrolling.
+- Edited *videoWriteChar* to support tabs (length 4).
+
+* CHANGELOG 0.2.0 
+- Function *convertFilename83* to convert filenames into a FAT formatted filename format.
+- Function *parseString* created to split a string into multiple tokens.
+- Function *charToLower* created to convert a character to lowercase.
+- Function *charToUpper* created to convert a character to uppercase.
+- Function *findString* created to find the next string to split into tokens.
+- Function *findSpace* created to find the next space in a string.
+- Function *strCmp* created to compare two diffrent strings.
+- Function *padStr* created to pad out a string to a passed length.
+- Function *strLen* created to get the length of a string.
+- Function *itoa* created to convert 32-bit number and base to a string.
+- Function *atoi* created to convert a string and base to a number. 
+
+* CHANGELOG 0.3.0
+- Function *kbdFlushBuffer* to flush the most recent key in the bios kbd buffer.
+- Function *kbdCheckBuffer* to check the bios kbd buffer.
+- Function *kbdGetChar* To get a character from the bios kbd buffer.
+- Function *kbdStoreKey* to store a character into the bios kbd buffer.
+- Function *kbdWaitUntillKey* to wait untill a key is pressed.
+- Function *kbdCaptureInput* to capture input from kbd and pass into buffer.
+  
+* CHANGELOG 0.3.1
+- Function *videoUpdateBiosCur* to update the bios cursor.
+- Fixed bios cursor issues on a soft reboot (reset).
+
+* CHANGELOG 0.4.0
+- Function *memBytesToBlocks32* to calculate size in bytes (32-bit value) to size in blocks. 
+- Function *memAddressToBlock* to convert a seg:off addr into a block.
+- Function *memBlockToAddress* to convert a block into a seg:off addr.
+- Function *memAllocNextBlock* to allocate next available block.
+- Function *memBytesToBlocks* to calculate size in bytes to size in blocks. 
+- Function *allocMemAddress* to manually allocate an address in size of bytes.
+- Function *memAllocBlocks* to allocate the next x available blocks.
+- Function *memFreeBlocks* to free blocks from a seg:off addr.
+- Function *memFreeBlock* to free a single block from a seg:off addr.
+- Function *setupMemoy* to initalize memory bitmap. (1 block = 512 bytes)
+
+* CHANGELOG 0.4.1
+- Fixed *setupMemory* to properly allocate the kernel in the memory map.
+
+* CHANGELOG 0.5.0 
+- Function *loadRootDir* to dynamicly allocate and read the root dir.
+- Function *unloadRootDir* to unallocate the root dir from anyware in memory.
+- Function *readRootDir* to read the contents of the root dir from the disk.
+- Function *writeRootDir* to write the new root dir contents to the disk.
+- Function *allocRootDir* to allocate the needed space for the root dir.
+- Funciton *freeRootDir* to unallocate the root dir.
+
+- Function *loadFat* to dynamicly allocate and read the FAT table.
+- Function *unloadFat* to unallocate the FAT table from anyware in memory.
+- Function *readFat* to read the FAT table from the disk.
+- Function *writeFat* to write the new FAT table to the disk.
+- Function *allocFat* to allocate the needed space for the FAT table.
+- Function *freeFat* to unallocate the FAT table.
+
+* CHANGELOG 0.6.0
+- Function *searchDir* to search FAT entries for a file.
+- Function *fileSize* to search for a file and return its 32-bit filesize.
+- Function *fileExists* to search for a file to see if it exists or not.
+- Function *createFile* to create a new file.
+- Function *renameFile* to change the name of a file. 
+- Function *deleteFile* to remove a singular file.
+- Function *readFile* to read an entire file into memory.
+- Function *writeFile* to write a file from memory onto the disk.
+
+* CHANGELOG 0.6.1
+- Function *memAllocBytes* to allocate bytes into memory.
+- Function *memFreeBytes* to free bytes from memory.
+
+* CHANGELOG 0.7.0
+- Function *cliLoop* to act as the main cli loop.
+- Command *DIR* to list the current contents of the root directory.
+- Command *RENAME* to change the name of a file.
+- Command *DEL* to remove a file.
+- Command *TYPE* to display the contents of a file.
+- Command *COPY* to copy one file's contents to another.
+- Command *CLS* to clear the screen.
+- Command *TIME* to display the current system time.
+- Command *DATE* to display the current system date.
+- Command *HELP* to list the currently supported commands.
+
+* CHANGELOG 0.8.0
+- Function *readClusters* to read the cluster chain.
+- Function *removeClusters* to remove the clusters within a cluster chain.
+- Function *writeClusters* to write the next available fat clusters to disk.
+- Function *changeDir* to set the current working directory.
+- Function *createDir* to create a new directory.
+- Function *removeDir* to remove a directory.
+
+- Command *CD* to change the current working directory.
+- Command *MD* to make a new directory.
+- Command *RD* to remove a directory.
+  
+* CHANGELOG 0.9.0 
+- Function *readCusters* now determines if to use FAT12 or FAT16.
+- Function *readClustersFAT12* to read FAT12 cluster chains.
+- Function *readClustersFAT16* to read FAT16 cluster chains.
+- Function *removeClusters* now determines if to use FAT12 or FAT16.
+- Function *removeClustersFAT12* to remove FAT12 cluster chains.
+- Function *removeClustersFAT16* to remove FAT16 cluster chains.
+- Function *writeClusters* now dertermines if to use FAT12 or FAT16.
+- Function *writeClustersFAT12* to write FAT12 clusters and data.
+- Function *writeClustersFAT16* to write FAT16 clusters and data.
+
+- Fixed alot of bugs between most FAT related functions.
+- Did extensive testing on a 2GB FAT16 image. Should be working.
+- Not as much testing for FAT12 on floppy images, but i dont see any issues. Yet.
+
+* CHANGELOG 1.0.0 
+- Command *RENAME* updated to support error handling.
+- Command *COPY* updated to support error handling.
+- Command *TYPE* updated to support error handling.
+- Command *DIR* updated to support error handling.
+- Command *CD* updated to support error handling.
+- Command *MD* updated to support error handling.
+- Command *RD* updated to support error handling.
+
+- Function *cmosRead* to read the contents from a CMOS register.
+- Function *cmosWrite* to write into a chosen CMOS register.
+- Function *cmosReadDate* to get the system date from the CMOS.
+- Function *cmosReadTime* to get the system time from the CMOS.
+
+- I plan to do some more looking into CMOS stuff, seems intresting.
+
+* Github Wiki
+** DONE cmos.asm
+** TODO keyboard.asm
+
+* STUFF
+** TODO Potental makefile/ ELF updates?
+** TODO Create correct time stamps for file write/ creation. 
+** TODO Change all root dir functions to dir, as dir handling now works.
+** TODO Look into serial ports more and make everything look nice.
