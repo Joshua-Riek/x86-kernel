@@ -19,38 +19,11 @@
 %ifndef __SUCC_INC_
 %define __SUCC_INC_ 1
 
-%define __SUCC_MAJOR_VERSION 0
-%define __SUCC_MINOR_VERSION 3
+%define __SUCC_MAJOR_VERSION 1
+%define __SUCC_MINOR_VERSION 0
 %define __SUCC_PATCHLEVEL    1
 
 %defstr __SUCC_VERSION       %[__SUCC_MAJOR_VERSION].%[__SUCC_MINOR_VERSION].%[__SUCC_PATCHLEVEL]
-
-%define NO_ERROR             0x00
-%define INVALID_FUNC         0x01
-%define FILE_NOT_FOUND       0x02
-%define PATH_NOT_FOUND       0x03
-%define NO_HANDLES_LEFT      0x04
-%define ACCESS_DENIED        0x05
-%define INVALID_HANDLE       0x06
- 
-%define INVALID_DRIVE        0x0f
-%define RM_CURRENT_DIR       0x10
-%define NOT_SAME_DEVICE      0x11
-%define NO_MORE_FILES        0x12
-    
-%define DRIVE_READ_ONLY      0x13
-%define DRIVE_NOT_READY      0x15
-%define UNKNOWN_COMMAND      0x16
-%define CRC_ERROR            0x17
-%define SEEK_ERROR           0x19
-%define UNKNOWN_MEDIA        0x1a
-%define SECTOR_NOT_FOUND     0x1b
-    
-%define WRITE_SECTOR_FAULT   0x1d
-%define READ_SECTOR_FAULT    0x1e
-%define GENERAL_FAILURE      0x1f
-
-%define FILE_EXISTS          0x51
 
 struc bpb                                       ; BPB - BIOS Parameter Block
   .bootJump:          resb 3                    ; Jump instruction over the OEM / BIOS param block

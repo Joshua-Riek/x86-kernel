@@ -37,7 +37,7 @@ CFLAGS       +=
 LDFLAGS      +=
 ARFLAGS      +=
 LDFLAGS      += -m elf_i386 -Ttext=0x1000
-NASMFLAGS    += -f elf -g3 -F dwarf
+NASMFLAGS    += -isrc/inc/ -O0 -f elf -g3 -F dwarf
 OBJCOPYFLAGS += -O binary
 
 # Disk image file
@@ -80,33 +80,33 @@ $(BINDIR):
 
 # Clean produced files
 clean:
-	rm -f $(OBJDIR)/* $(OBJDIR)/* $(BINDIR)/*
+	rm -f $(OBJDIR)/* $(BINDIR)/*.bin $(BINDIR)/*.elf
 
 # Clean files from emacs
 clobber: clean
 	rm -f $(SRCDIR)/*~ $(SRCDIR)\#*\# ./*~
 
 
-# Write the kernel to a disk image
-install:
-	cp "big clust copy.img" $(DISKIMG)
+# Fix for error "cp: cannot create regular file"
+# mount B: \b
 
+# Write the kernel to a disk image
+install: 
+	cp $(BINDIR)/1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
-#   Fix for error "cp: cannot create regular file"
-#   mount B: \b
 	cp $(BINDIR)/kernel.bin B:/kernel.bin
 	imdisk -D -m B:
-#	$(QEMU) -fda $(DISKIMG)
-#	imdisk -a -f $(DISKIMG) -m B:
-#	start B:\FOO.TXT
-#	imdisk -D -m B:
+
+#install:
+#	cp $(BINDIR)/kernel.bin B:/kernel.bin
+#	rawcopy -l -m \\\.\B: $(DISKIMG)
 
 # Run the disk image
 run:
-	$(QEMU) -fda $(DISKIMG)
+	$(QEMU) -serial stdio -rtc base=localtime -fda $(DISKIMG)
 
 
 # Start a debug session with qemu
 debug:
-	$(QEMU) -S -s -fda $(DISKIMG)
+	$(QEMU) -serial stdio -rtc base=localtime -S -s -fda $(DISKIMG)
 

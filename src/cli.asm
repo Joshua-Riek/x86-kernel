@@ -14,14 +14,43 @@
 ;
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-;  
- 
+;
+    
+;---------------------------------------------------
+; Cli functions
+;---------------------------------------------------   
+;
+; doDir IN=> None; OUT=> None
+; doRename IN=> BX=Ptr to str, CX=Ptr to str; OUT=> None
+; doDel IN=> BX=Ptr to str; OUT=> None
+; doType IN=> BX=Ptr to str; OUT=> None
+; doCopy IN=> BX=Ptr to str, CX=Ptr to str; OUT
+; doCls IN=> None; OUT=> None
+; doTime IN=> None; OUT=> None
+; doDate IN=> None; OUT=> None
+; doHelp IN=> None; OUT=> None
+; doCd IN=> BX=Ptr to str; OUT=> None
+; doWarranty IN=> None; OUT=> None
+; doRedistrib IN=> None; OUT=> None
+; driveToAscii IN=> DL=Drive; OUT=> AL=Ascii drive letter
+; bcd IN=> AL=Number; OUT=> AL=BCD Number
+    
+;---------------------------------------------------
+; Cli varables
+;---------------------------------------------------
+
     requiredParamErr  db "Required parameter missing", 13, 10, 0
     fileNotFoundOrErr db "Duplicate file name or file not found", 13, 10, 0
-    readSectorErr     db "Failure to read sectors on drive ", 0
-    writeSectorErr    db "Failure to write sectors on drive ", 0
+    readSectorErr     db "Error reading from device", 0
+    writeSectorErr    db "Error writing to device", 0
     badCommandErr     db "Bad command or filename", 13, 10, 0
+    needFileNameErr   db "Missing file name", 13, 10, 0
     fileNotFoundErr   db "File not found", 13, 10, 0
+    memoryErr         db "Insufficient disk space", 13, 10, 0
+    fileCreateErr     db "File creation error", 13, 10, 0    
+    badDirErr         db "Invalid directory", 13, 10, 0
+    badMkDirErr       db "Unable to create directory", 13, 10, 0
+    badRmDirErr       db "Not a directory or the directory is not empty", 13, 10, 0
     currentDate       db "Current date is ", 0
     currentTime       db "Current time is ", 0
     files             db " File(s) ", 0
@@ -29,36 +58,66 @@
     dayOfWeek         db "Sun ", 0, "Mon ", 0, "Tue ", 0,
                       db "Wed ", 0, "Thu ", 0, "Fri ", 0,
                       db "Sat ", 0
-
-    cmdCopy           db "COPY", 0
     cmdDir            db "DIR", 0
     cmdRename         db "RENAME", 0
     cmdRen            db "REN", 0
     cmdErase          db "ERASE", 0
     cmdDel            db "DEL", 0
     cmdType           db "TYPE", 0
+    cmdCopy           db "COPY", 0
+    cmdCls            db "CLS", 0
     cmdEdit           db "EDIT", 0
     cmdDate           db "DATE", 0
     cmdTime           db "TIME", 0
     cmdHelp           db "HELP", 0
+    cmdCd             db "CD", 0
+    cmdChdir          db "CHDIR", 0
+    cmdMd             db "MD", 0
+    cmdMkdir          db "MKDIR", 0
+    cmdRd             db "RD", 0
+    cmdRmdir          db "RMDIR", 0
     cmdWarranty       db "WARRANTY", 0
     cmdRedistrib      db "REDISTRIB", 0
     cmdDump           db "DUMP", 0
-    cliBuff times 66  db 0
-cmdNew db "NEW", 0
     
-    cmdDirDesc  db 9, 9, "List files and folders in a directory", 13, 10, 0
-    cmdRenDesc  db 9,    "Change the name of files and directories", 13, 10, 0
-    cmdDelDesc  db 9, 9, "Remove one or more files", 13, 10, 0
-    cmdTypeDesc db 9,    "Display the contents of a text file", 13, 10, 0
-    cmdTimeDesc db 9,    "View the computer's time", 13, 10, 0
-    cmdDateDesc db 9,    "Look at the current date of the computer", 13, 10, 0
-    cmdHelpDesc db 9,    "List the available commands", 13, 10, 0
+    cmdDirDesc        db 9, 9, "List the contents of a directory", 13, 10, 0
+    cmdRenDesc        db 9,    "Renames a file or directory", 13, 10, 0
+    cmdDelDesc        db 9, 9, "Deletes a file", 13, 10, 0
+    cmdTypeDesc       db 9,    "Display the contents of a file", 13, 10, 0
+    cmdCopyDesc       db 9,    "Copy a file to an alternate location", 13, 10, 0
+    cmdClsDesc        db 9, 9, "Clears the screen", 13, 10, 0
+    cmdTimeDesc       db 9,    "View the system time", 13, 10, 0
+    cmdDateDesc       db 9,    "View the system date", 13, 10, 0
+    cmdHelpDesc       db 9,    "List the available commands", 13, 10, 0
+    cmdCdDesc         db 9, 9, "Change directories", 13, 10, 0
+    cmdMdDesc         db 9, 9, "Creates a directory", 13, 10, 0
+    cmdRdDesc         db 9, 9, "Removes an empty directory", 13, 10, 0
+    
+    cliBuff times 96  db 0
+    pathBuf times 96  db 0
 
-    ; TODO: Time set/view
-    ;       Date set/view
-    
+;---------------------------------------------------
 cliLoop:
+;
+; This is the main command line interface loop.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    mov cx, cs
+    mov ds, cx
+    mov es, cx
+    
+    mov si, cliBuff
+    mov cx, 96
+    
+  .zeroLoop:
+    mov byte [ds:si], 0
+    inc si
+    loop .zeroLoop
+
     mov al, 0x0a                                ; Line feed
     call videoWriteChar
     mov al, 0x0d                                ; Newline
@@ -73,6 +132,8 @@ cliLoop:
     call videoWriteChar
     mov al, 0x5c                                ; Ascii '\'
     call videoWriteChar
+    mov si, pathBuf
+    call videoWriteStr
     mov al, 0x3e                                ; Ascii '>'
     call videoWriteChar
 
@@ -86,25 +147,23 @@ cliLoop:
     call videoWriteChar
 
   .parseInput:
+    mov ah, ' '
     mov si, cliBuff
     mov di, cliBuff
-    call parseString                            ; Parse through the user input string
+    call parseStr                               ; Parse through the user input string
 
     mov di, si
 
   .parseCommands:
-    ;cmp al, 0                                   ; Do nothing if input empty
-    ;je .displayPrompt
+    mov al, byte [ds:si]
+    cmp al, 0                                   ; Do nothing if input empty
+    je .displayPrompt
 
-    mov si, cmdCopy
-    call strCmp
-    jc doCopy
-    
-    mov si, cmdDir
+    mov si, cmdDir                              ; Dir
     call strCmp
     jc doDir
 
-    mov si, cmdRename                            ; Rename
+    mov si, cmdRename                           ; Rename
     call strCmp
     jc doRename
     
@@ -120,27 +179,54 @@ cliLoop:
     call strCmp
     jc doDel
     
-;    mov si, cmdNew                             ; New
-;    call strCmp
-    ;    jc doNew
-    
     mov si, cmdType                             ; Type
     call strCmp
     jc doType
 
+    mov si, cmdCopy                             ; Copy
+    call strCmp
+    jc doCopy
 
-;    mov si, cmdTime                             ; Time
-;    call strCmp
-;    jc doTime
+    mov si, cmdCls                              ; Cls
+    call strCmp
+    jc doCls
 
-;    mov si, cmdDate                             ; Date
-;    call strCmp
-;    jc doDate
+    mov si, cmdTime                             ; Time
+    call strCmp
+    jc doTime
+
+    mov si, cmdDate                             ; Date
+    call strCmp
+    jc doDate
     
     mov si, cmdHelp                             ; Help
     call strCmp
     jc doHelp
+
+    mov si, cmdCd                               ; Cd
+    call strCmp
+    jc doCd
+
+    mov si, cmdChdir
+    call strCmp
+    jc doCd
     
+    mov si, cmdMd                               ; Md
+    call strCmp
+    jc doMd
+
+    mov si, cmdMkdir
+    call strCmp
+    jc doMd
+
+    mov si, cmdRd                               ; Rd
+    call strCmp
+    jc doRd
+
+    mov si, cmdRmdir
+    call strCmp
+    jc doRd
+
     mov si, cmdWarranty                         ; Warranty
     call strCmp
     jc doWarranty
@@ -148,45 +234,32 @@ cliLoop:
     mov si, cmdRedistrib                        ; Redistrib
     call strCmp
     jc doRedistrib
-
-    mov si, cmdDump
-    call strCmp
-    jc doDump
     
     mov si, badCommandErr                       ; Bad command
     call videoWriteStr
     jmp cliLoop
 
+;---------------------------------------------------
 doDir:
-    push es
-    push ds
-    push di
-    push si
-    push ax
+;
+; Display the contents of the root directory.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
     push bx
     push cx
     push dx
+    push si
+    push di
+    push es
+    push ds
     
- 
-    
-    xor dx, dx
-    mov ax, 32
-    mul word [cs:rootDirEntries]                ; Calculate the size of the root dir in bytes
-
-    xchg ax, bx
-    call memBytesToBlocks                       ; Convert bytes to blocks
-
-    mov bx, ax
-    call memAllocBlocks                         ; Allocate memory
-    jc .memError                                ; Out of memory
-    
-    mov es, ax
-    mov di, dx
-
-    mov cx, word [rootDirSize]                  ; Read the size in sectors of the directory
-    mov ax, word [rootDirSector]                ; Starting sector of the directory
-    call readSectors                            ; Read the sectors 
-    jc .error
+    call loadRootDir                            ; Allocate and load the root dir into memory
+    jc .loadDirError
 
     push es
     push di
@@ -221,6 +294,8 @@ doDir:
     inc dx                                      ; Increase higher half of the 32-bit filesize
     
   .noCarry:
+    add dx, word [es:di+dirFat.filesize+2]
+    
     push bx
     push dx
     push cx
@@ -247,17 +322,45 @@ doDir:
     sub di, 11                                  ; Subtract the length of the name and ext
 
   .printFilesize:
-    mov al, 0x09                                ; Horizontal tab
+    xor ax, ax
+    mov al, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    cmp al, 0x10                                ; Check to see if its a directory
+    jne .fileEntry
+    
+    mov al, ' '
     call videoWriteChar
-
-    mov ax, word [es:di+dirFat.filesize]        ; Lower half of the filesize, max is 64kb
+    mov al, ' '
+    call videoWriteChar
+    mov al, ' '
+    call videoWriteChar
+    mov al, ' '
+    call videoWriteChar
+    mov al, ' '
+    call videoWriteChar
+    mov al, '<'
+    call videoWriteChar
+    mov al, 'D'
+    call videoWriteChar
+    mov al, 'I'
+    call videoWriteChar
+    mov al, 'R'
+    call videoWriteChar
+    mov al, '>'
+    call videoWriteChar
+    mov al, ' '
+    call videoWriteChar
+    mov al, ' '
+    call videoWriteChar
+    jmp .printDate
+    
+  .fileEntry:
+    mov ax, word [es:di+dirFat.filesize]        ; Lo word of filesize
+    mov dx, word [es:di+dirFat.filesize+2]      ; Hi word of filesize
     mov bx, 10                                  ; Decimal int
-    mov ch, 5                                   ; Pad length
+    mov ch, 10                                  ; Pad length
     mov cl, ' '                                 ; Pad with spaces
-    call videoWriteNumPadding
+    call videoWriteNumPadding32
 
-    mov al, 0x20                                ; White space 
-    call videoWriteChar
     mov al, 0x20                                ; White space 
     call videoWriteChar
     mov al, 0x20                                ; White space 
@@ -273,6 +376,7 @@ doDir:
     shr ax, 1
     shr ax, 1
     shr ax, 1
+    mov bx, 10                                  ; Decimal int
     mov ch, 2                                   ; Pad length
     mov cl, ' '                                 ; Pad with spaces
     call videoWriteNumPadding
@@ -402,6 +506,7 @@ doDir:
     mov al, 0x09                                ; Write a tab
     call videoWriteChar  
 
+    mov bx, 10
     mov ax, cx                                  ; Write the number of files in the dir
     call videoWriteNum
     mov si, files                               ; Write the 'file(s)' string
@@ -430,20 +535,36 @@ doDir:
     pop bx
     pop dx
     pop ax
-    call memFreeBlocks                          ; Free memory
     
-    push es
-    push ds
-    push di
-    push si
-    push ax
-    push bx
-    push cx
-    push dx
+    call unloadRootDir
+    
+    pop si
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
     jmp cliLoop
     
-.memError:
-.error:
+  .loadDirError:
+    mov si, readSectorErr
+    call videoWriteStr
+    
+    pop si
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
   
 ;---------------------------------------------------
 doRename:
@@ -456,203 +577,52 @@ doRename:
 ; Returns: Nothing
 ;
 ;---------------------------------------------------
-
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
     
     or cx, cx                                   ; Ensure that the user inputted a filename
     jz paramError
 
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push di
-    push es
-
-    
-    mov si, bx
-    mov di, cx
-    call renameFile
-    jc .renameFailure
-      
-    pop es                                      ; Restore registers
-    pop di
-    pop cx
-    pop bx
-    pop ax
-    jmp cliLoop
-
-  .renameFailure:
-    push si
-    
-    mov si, fileNotFoundOrErr                   ; Write out an error message
-    call videoWriteStr
-    
-    pop si
-    
-    pop es                                      ; Restore registers
-    pop di
-    pop cx
-    pop bx
-    pop ax
-    jmp cliLoop
-
-doCopy:
-    
-    or bx, bx                                   ; Ensure that the user inputted a filename
-    jz paramError
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
     push si
     push di
-    push es
-    push ds
-    
 
-    mov dx, 0x2000
-    mov es, dx
-    mov di, 0x0
-    
     mov si, bx
-    call readFile
-    jc .readFailure
-
+    call fileExists                             ; Check to see if the filename exists
+    jc .fileNotFound
+    
     mov si, cx
-    call writeFile
+    call fileExists                             ; Check to see if the filename allready exists
+    jnc .fileAllreadyExists
     
-    pop ds                                      ; Restore registers
-    pop es
+    mov si, bx                                  ; File to rename
+    mov di, cx                                  ; New filename
+    call renameFile                             ; Now call the rename file function
+    jc .renameFailure
+
     pop di
     pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    stc                                         ; Set carry, error occured
+    
     jmp cliLoop
     
-  .readFailure:
-    push si
-    
-    mov si, fileNotFoundOrErr                   ; Write out an error message
+  .fileNotFound:
+    mov si, fileNotFoundErr
     call videoWriteStr
+    jmp .error
     
-    pop si
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-
-    jmp cliLoop
-;---------------------------------------------------
-doType:
-;
-; Command to delete a file.
-;
-; Expects: BX    = File to remove
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    or bx, bx                                   ; Ensure that the user inputted a filename
-    jz paramError
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    push es
-    push ds
-    
-
-    mov dx, 0x2000
-    mov es, dx
-    mov di, 0x0
-    
-    mov si, bx
-    call readFile
-    jc .readFailure
-
-    ; size in AX:DX
-    ; counter in BX:CX
-    cmp ax, 0
-    je .done
-    
-    mov cx, ax
-    
-  .readBytes:
-    mov al, byte [es:di]
-    call videoWriteChar
-
-    clc
-    add di, 1
-    jnc .nextByte 
-
-  .fixBuffer:
-    push dx                                     ; An error will occur if the buffer in memory
-    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
-    add dh, 0x10                                ; it will trigger the carry flag, so correct
-    mov es, dx                                  ; extra segment by 0x1000
-    pop dx
-    
-.nextByte:
-    dec cx
-    cmp cx, 0
-    jne .readBytes
-
-    cmp dx, 0
-    je .done
-
-    sub dx, 1
-
-
-    
-    mov cx, 0xffff
-    jmp .nextByte
-
-    
-.done:
-        mov al, 0x0a
-    call videoWriteChar                         ; Line feed
-    mov al, 0x0d
-    call videoWriteChar                         ; Newline
-    
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    stc                                         ; Set carry, error occured
-    jmp cliLoop
-    
-  .readFailure:
-    push si
-    
-    mov si, fileNotFoundOrErr                   ; Write out an error message
+  .fileAllreadyExists:
+    mov si, fileNotFoundOrErr
     call videoWriteStr
+    jmp .error
     
-    pop si
-    pop ds                                      ; Restore registers
-    pop es
+  .renameFailure:
+    mov si, writeSectorErr
+    call videoWriteStr
+
+  .error:
     pop di
     pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-
+    
     jmp cliLoop
-
 
 ;---------------------------------------------------
 doDel:
@@ -667,42 +637,349 @@ doDel:
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
 
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push di
-    push es
+    push si
 
-    xor dx, dx
-    mov es, dx
-    mov di, 0x5600
-    
-    mov ax, bx
-    call deleteFile
+    mov si, bx                                  ; File to delete
+    call deleteFile                             ; Call the function to delete the file
     jc .deleteFailure
-      
-    pop es                                      ; Restore registers
-    pop di
-    pop cx
-    pop bx
-    pop ax
-    
+
+    pop si
     jmp cliLoop
     
-  .deleteFailure:
-    push si
-    
+  .deleteFailure:    
     mov si, fileNotFoundOrErr                   ; Write out an error message
     call videoWriteStr
     
     pop si
+    jmp cliLoop
+
+;---------------------------------------------------
+doType:
+;
+; Command to show the contents of a file.
+;
+; Expects: BX    = File to remove
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
     
-    pop es                                      ; Restore registers
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov si, bx                                  ; Start by getting the filesize,
+    call fileSize                               ; also tests to see if the file exists
+    jc .fileNotFound
+    
+    call memAllocBytes
+    jc .memError
+    
+    call readFile                               ; Now we read the file into memory
+    jc .readFailure                             ; Size goes into ax:dx
+
+    call memFreeBytes                           ; Free up the memory
+
+    xchg ax, dx
+    
+    cmp ax, 0
+    jne .start                                  ; If ax:dx are is empty, we are done
+    cmp dx, 0
+    je .done
+
+  .start:
+    mov cx, ax
+    
+  .readBytes:
+    mov al, byte [es:di]                        ; Grab the next byte from the file
+    call videoWriteChar
+
+    clc
+    add di, 1                                   ; Increaese the pointer, buffer fix
+    jnc .nextByte 
+
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+    
+  .nextByte:
+    dec cx
+    
+    cmp cx, 0                                   ; Decrease counter and see if we are at the end
+    jne .readBytes
+    cmp dx, 0
+    je .done
+
+    sub dx, 1
+    mov cx, 0xffff
+    jmp .nextByte
+    
+  .done:
+    mov al, 0x0a
+    call videoWriteChar                         ; Line feed
+    mov al, 0x0d
+    call videoWriteChar                         ; Newline
+    
+    pop ds                                      ; Restore registers
+    pop es
     pop di
+    pop si
+    pop dx
     pop cx
     pop bx
     pop ax
+
     jmp cliLoop
+    
+  .readFailure:  
+    call memFreeBytes                           ; Free up the memory used on error
+    mov si, readSectorErr
+    call videoWriteStr
+    jmp .error
+    
+  .fileNotFound:
+    mov si, fileNotFoundErr
+    call videoWriteStr
+    jmp .error
+    
+  .memError:
+    mov si, memoryErr
+    call videoWriteStr
+    
+  .error:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+;---------------------------------------------------   
+doCopy:
+;
+; Command to show the contents of a file.
+;
+; Expects: BX    = File to copy
+;          CX    = File to create and write
+;
+; Returns: Nothing
+;
+;---------------------------------------------------   
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
+
+    or cx, cx                                   ; Ensure that the user inputted a filename
+    jz paramError
+    
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov si, cx
+    call fileExists                             ; See if the file to create allready exists
+    jnc .fileAllreadyExists
+    
+    mov si, bx                                  ; Start by getting the filesize,
+    call fileSize                               ; also tests to see if the file exists
+    jc .fileNotFound
+
+    call memAllocBytes                          ; Allocate space for the file 
+    jc .memError
+    
+    call readFile                               ; Now we read the file into memory
+    jc .readFailure                             ; Size goes into ax:dx
+
+    mov si, cx
+    call writeFile                              ; Finally write data into a new file
+    jc .writeFailure
+    
+    call memFreeBytes                           ; Free up the memory
+       
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+    
+  .writeFailure:
+    call memFreeBytes                           ; Free up the memory used on error
+    mov si, writeSectorErr
+    call videoWriteStr
+    jmp .error
+
+  .readFailure:  
+    call memFreeBytes                           ; Free up the memory used on error
+    mov si, readSectorErr
+    call videoWriteStr
+    jmp .error
+    
+  .fileAllreadyExists: 
+    mov si, fileNotFoundOrErr
+    call videoWriteStr
+    jmp .error
+    
+  .fileNotFound:
+    mov si, fileNotFoundErr
+    call videoWriteStr
+    jmp .error
+    
+  .memError:
+    mov si, memoryErr
+    call videoWriteStr
+    
+  .error:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+;---------------------------------------------------   
+doCls:
+;
+; Command to clear the screen.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------   
+    call videoClearScreen
+
+    jmp cliLoop
+
+;---------------------------------------------------   
+doTime:
+;
+; Command to display the system time.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    mov si, currentTime
+    call videoWriteStr
+    
+    mov ah, 0x02                                ; Read RTC time
+    int 0x1a                                    ; System and RTC BIOS services
+
+    mov al, ch                                  ; Hours in BCD
+    call bcd                                    ; Convert BCD
+    mov ch, al
+    
+    mov al, cl                                  ; Minutes in BCD
+    call bcd                                    ; Convert BCD
+    mov cl, al
+    
+    mov al, dh                                  ; Seconds in BCD
+    call bcd                                    ; Convert BCD
+    mov dh, al
+
+    mov bx, 10                                  ; Base 10 number
+    xor ah, ah
+    mov al, ch                                  ; Hours
+    call videoWriteNum                          ; Write as a number
+
+    mov al, ':'
+    call videoWriteChar
+    
+    mov al, cl                                  ; Minutes
+    call videoWriteNum                          ; Write as a number
+
+    mov al, ':'
+    call videoWriteChar
+        
+    mov al, dh                                  ; Seconds
+    call videoWriteNum                          ; Write as a number
+    
+    jmp cliLoop
+    
+;---------------------------------------------------   
+doDate:
+;
+; Command to display the system date.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    mov si, currentDate
+    call videoWriteStr
+
+    mov ah, 0x04                                ; Read RTC date
+    int 0x1a                                    ; System and RTC BIOS services
+
+    mov al, ch                                  ; Century in BCD
+    call bcd                                    ; Convert BCD
+    mov ch, al
+    
+    mov al, cl                                  ; Year in BCD
+    call bcd                                    ; Convert BCD
+    mov cl, al
+    
+    mov al, dh                                  ; Month in BCD
+    call bcd                                    ; Convert BCD
+    mov dh, al
+
+    mov al, dl                                  ; Day in BCD
+    call bcd                                    ; Convert BCD
+    mov dl, al
+
+    mov bx, 10                                  ; Base 10 number
+    xor ah, ah
+    mov al, dh                                  ; Month
+    call videoWriteNum                          ; Write as a number
+
+    mov al, '-'
+    call videoWriteChar
+
+    mov al, dl                                  ; Day
+    call videoWriteNum                          ; Write as a number
+
+    mov al, '-'
+    call videoWriteChar
+
+    mov al, ch                                  ; Century
+    call videoWriteNum                          ; Write as a number
+
+    mov al, cl                                  ; Year
+    mov cl, '0'                                 ; Write as a padded number
+    mov ch, 2
+    call videoWriteNumPadding
+
+    jmp cliLoop
+
     
 paramError:
     push si                                     ; Save registers
@@ -716,7 +993,16 @@ paramError:
 
 
     
+;---------------------------------------------------
 doHelp:
+;
+; Command to display system cli commands.
+;
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
     push si
 
     mov si, cmdDir
@@ -739,6 +1025,16 @@ doHelp:
     mov si, cmdTypeDesc
     call videoWriteStr                          ; Print the command description
 
+    mov si, cmdCopy
+    call videoWriteStr                          ; Print the command name
+    mov si, cmdCopyDesc
+    call videoWriteStr                          ; Print the command description
+
+    mov si, cmdCls
+    call videoWriteStr                          ; Print the command name
+    mov si, cmdClsDesc
+    call videoWriteStr                          ; Print the command description
+
     mov si, cmdTime
     call videoWriteStr                          ; Print the command name
     mov si, cmdTimeDesc
@@ -754,10 +1050,227 @@ doHelp:
     mov si, cmdHelpDesc
     call videoWriteStr                          ; Print the command description
 
+    mov si, cmdCd
+    call videoWriteStr                          ; Print the command name
+    mov si, cmdCdDesc
+    call videoWriteStr                          ; Print the command description
+
+    mov si, cmdMd
+    call videoWriteStr                          ; Print the command name
+    mov si, cmdMdDesc
+    call videoWriteStr                          ; Print the command description
+
+    mov si, cmdRd
+    call videoWriteStr                          ; Print the command name
+    mov si, cmdRdDesc
+    call videoWriteStr                          ; Print the command description
+    
     pop si
     jmp cliLoop
+    
+;---------------------------------------------------
+doCd:
+;
+; Command to change the current directory.
+;
+; Expects: BX    = Directory
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
+    
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
 
+    mov si, bx
+    call changeDir                              ; Attempt to change current dir
+    jc .changeDirError
+    
+    mov ax, word [ds:bx]
+    cmp ax, '..'
+    jne .1dot
 
+  .2dots:
+    mov si, pathBuf
+    call strLen
+    add si, cx                                  ; Start at the end of the current path string
+    dec si                                      ; Move back one to get the last char (should be a '\') 
+    mov al, 0                                   ; Then fill it with a zero /null byte
+    mov byte [ds:si], al
+    dec si
+    
+  .search1:
+    mov al, byte [ds:si]                        ; Grab the next byte from the current path string
+    cmp al, 0x5c                                ; Check for a slash '\'
+    je .done
+    mov al, 0                                   ; If no slash, fill the character with a null byte
+    mov byte [ds:si], al
+    dec si
+    loop .search1
+    jmp .done
+    
+  .1dot:
+    cmp al, '.'
+    je .done
+
+  .dirName:
+    mov di, bx
+    mov si, pathBuf
+    call strLen
+    add si, cx
+
+  .search2:   
+    mov al, byte [es:di]                        ; Grab the next byte from dir string
+    call charToUpper                            ; Convert the char to uppercase
+    mov byte [ds:si], al                        ; And shove it into the current path string
+    inc si
+    inc di
+    cmp al, 0                                   ; Check for the end of the string
+    je .end
+    jmp .search2
+
+  .end:
+    dec si
+    mov byte [ds:si], 0x5c                      ; End it with a slash
+
+  .done:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+  .changeDirError: 
+    mov si, badDirErr                           ; Write out an error message
+    call videoWriteStr
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+    
+;---------------------------------------------------
+doMd:
+;
+; Command to make a new directory.
+;
+; Expects: BX    = Directory
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
+    
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov si, bx
+    call createDir                              ; Attempt to create a new dir
+    jc .createDirError
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+  .createDirError: 
+    mov si, badMkDirErr                         ; Write out an error message
+    call videoWriteStr
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+    
+;---------------------------------------------------
+doRd:
+;
+; Command to remove a directory.
+;
+; Expects: BX    = Directory
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    or bx, bx                                   ; Ensure that the user inputted a filename
+    jz paramError
+    
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov si, bx
+    call removeDir                              ; Attempt to remove a dir
+    jc .removeDirError
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+  .removeDirError: 
+    mov si, badRmDirErr                         ; Write out an error message
+    call videoWriteStr
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
 doDump:
     push si
     
@@ -973,4 +1486,3 @@ driveToAscii:
 
   .done:
     ret
-    

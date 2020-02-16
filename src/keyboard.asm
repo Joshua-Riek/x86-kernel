@@ -16,7 +16,7 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-    
+
 %define BIOS_SEG                0x0040          ; (BIOS_SEG  << 4) + BIOS_OFF  = 0x0400
 %define BIOS_OFF                0x0000
     
@@ -34,6 +34,17 @@
 %define KEYBOARD_STATUS         0x0096          ; Keyboard status info (AT+ only)
 %define KEYBOARD_INTERNAL_FLAGS 0x0097          ; Flags for the kbd controller and LED states (AT+ only)
 
+;---------------------------------------------------
+; BIOS kbd functions
+;---------------------------------------------------
+;
+; kbdFlushBuffer IN=> None; OUT=> None
+; kbdCheckBuffer IN=> None; OUT=> AX=Buffer status
+; kbdCheckBuffer IN=> None; OUT=> AH=Scan code, AL=Ascii code
+; kbdStoreKey IN=> CH=Scan code, CL=Ascii code; OUT=> AX=0 (buff full), AX=1 (stored key)
+; kbdWaitUntillKey IN=> None; OUT=> AH=Scan code, AL=Ascii code
+; kbdCaptureInput IN=> DS:SI=Ptr to buffer
+    
 ;---------------------------------------------------
 kbdFlushBuffer:
 ;
@@ -204,7 +215,7 @@ kbdWaitUntillKey:
 ;          AL    = Ascii code
 ;
 ;---------------------------------------------------
-    call kbdFlushBuffer                   ; Flush the most recent char (to be safe)
+    call kbdFlushBuffer                       ; Flush the most recent char (to be safe)
 
   .wait:
     call kbdGetChar                           ; Try to read a key from the bios kbd buffer
@@ -233,7 +244,7 @@ kbdCaptureInput:
     xor cl, cl                                  ; Ready for character counter
 
   .loop:
-    call kbdWaitUntillKey                      ; Wait for a keypress    
+    call kbdWaitUntillKey                       ; Wait for a keypress    
 
     cmp al, 0x08                                ; Check for a back space
     je .backspace
@@ -271,6 +282,7 @@ kbdCaptureInput:
     dec byte [curX]
     call videoUpdateCur
     pop ds
+    
     
     jmp .loop
 

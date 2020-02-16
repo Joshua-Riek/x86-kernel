@@ -16,9 +16,52 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-    
+
 ;---------------------------------------------------
-; Memory manager varables
+; Video constants
+;---------------------------------------------------
+    
+%define VIDEO_MEMORY_SEG 0xb800                 ; (VIDEO_MEMORY_SEG  << 4) + VIDEO_MEMORY_OFF  = 0xb8000
+%define VIDEO_MEMORY_OFF 0x0000
+    
+%define BLACK            0x0                    ; Text mode 0 color palette
+%define BLUE             0x1                    ; Set color bit by (background << 4) | (foreground & 0x0f)
+%define GREEN            0x2
+%define CYAN             0x3
+%define RED              0x4
+%define MAGENTA          0x5
+%define BROWN            0x6
+%define LIGHT_GREY       0x7
+%define DARK_GREY        0x8
+%define LIGHT_BLUE       0x9
+%define LIGHT_GREEN      0xa
+%define LIGHT_CYAN       0xb
+%define LIGHT_RED        0xc
+%define LIGHT_MAGENTA    0xd
+%define YELLOW           0xe
+%define WHITE            0xf
+
+;---------------------------------------------------
+; Video functions
+;---------------------------------------------------   
+;
+; setupVideo IN=> None; OUT=> None
+; videoWriteChar IN=> AL=Char; OUT=> None
+; videoWriteStr IN=> DS:SI=Ptr to str; OUT=> None
+; videoWriteNumPadding32 IN=> AX:DX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
+; videoWriteNumPadding IN=> AX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
+; videoWriteNum32 IN=> AX:DX=Num, BX=Base; OUT=> None
+; videoWriteNum IN=> AX=Num, BX=Base; OUT=> None
+; videoScroll IN=> None; OUT=> None
+; videoClearScreen IN=> None; OUT=> None
+; videoSaveScreen IN=> None; OUT=> None
+; videoRestoreScreen IN=> None; OUT=> None
+; videoUpdateBiosCur IN=> None; OUT=> None
+; videoUpdateCur IN=> None; OUT=> None
+
+       
+;---------------------------------------------------
+; Video varables
 ;---------------------------------------------------
 
     curY  db 0                                  ; Cursor Y pos value
@@ -86,7 +129,7 @@ videoWriteChar:
 
     mov dl, al                                  ; Save the char 
 
-    mov ax, 0xb800                              ; Video memory segment
+    mov ax, VIDEO_MEMORY_SEG                    ; Video memory segment
     mov es, ax 
 
     mov ax, cs                                  ; Set the data segment to the code segment
@@ -206,162 +249,11 @@ videoWriteStr:
     pop ax
     
     ret
-    
-;---------------------------------------------------
-videoScroll:
-;
-; Scroll the screen up one line, if cursor is on the
-; last available line.
-;    
-; Expects: Nothing
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    push ax                                     ; Save registers
-    push di
-    push es
-    push ds
-
-    mov ax, cs                                  ; Set the data segment to the code segment
-    mov ds, ax                                  ; This is to ensure correct data refrences 
-
-    cmp byte [curY], 25                         ; See if scrolling the screen is even needed
-    jnge .done
-    
-    mov ax, 0xb800                              ; Video memory segment
-    mov es, ax
-
-    mov di, 0*(80*2)                            ; Take the top line 
-    
-  .moveLine:
-    mov ax, word [es:di+80*2]                   ; Grab a byte from es:di + size of char * screen width
-    mov word [es:di], ax                        ; Shove the byte to the top line into es:di
-
-    inc di                                      ; Increase the video memory offset
-    
-    cmp di, 25*(80*2)                           ; Continue untill everything has been moved up by one
-    jl .moveLine
-    
-
-    mov di, 24*(80*2)                           ; This is the bottom line
-    
-  .clearLine:
-    mov ah, byte [color]                        ; Grab the current text color
-    mov al, ' '                                 ; Fill with a whitespace
-    
-    mov word [es:di], ax                        ; Shove the byte to the bottom line in es:di
-
-    add di, 2                                   ; Increase the video memory offset
-    
-    cmp di, 25*(80*2)                           ; Continue untill the bottom line is cleared
-    jle .clearLine
-    
-    mov byte [curY], 24                         ; Decrease the cursor ypos
-
-  .done:
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop ax
-
-    ret
-    
-;---------------------------------------------------
-videoWriteNum:
-;
-; Converts a number and base to a string.
-;
-; Expects: AX    = Number to display
-;          BX    = Base of number
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push dx
-    push si
-    push ds
-
-    mov ax, cs                                  ; Set the data segment to the code segment
-    mov ds, ax                                  ; This is to ensure correct data refrences 
-    
-    xor dx, dx                                  ; Handle a 16-bit number
-    mov si, .buffer                             ; Output string buffer
-    call itoa                                   ; Convert the number to a string
-
-    mov si, .buffer 
-    call videoWriteStr                          ; Print the buffer that is now padded
-    
-    pop ds                                      ; Restore registers
-    pop si
-    pop dx
-    pop bx
-    pop ax
-    
-    ret
-
-  .buffer times 32 db 0
-    
-;---------------------------------------------------
-videoWriteNumPadding:
-;
-; Converts a number and base to a string
-; with padding.
-;
-; Expects: AX    = Number to display
-;          BX    = Base of number
-;          CL    = Char to pad with
-;          CH    = Padding length
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    push ds
-    push es
-    
-    mov dx, cs                                  ; Set the data segment to the code segment
-    mov ds, dx                                  ; This is to ensure correct data refrences 
-    mov es, dx
-    
-    xor dx, dx                                  ; Handle a 16-bit number
-    mov si, .buffer1                            ; Output string buffer
-    call itoa                                   ; Convert the number to a string
-    
-    mov al, cl                                  ; Move the char to pad with into al
-    mov cl, ch                                  ; Move the padding length into cl
-    xor ch, ch                                  ; Clear the higher half of cx
-    mov di, .buffer2                            ; Padd out the string 
-    call padStr
-    
-    mov si, .buffer2
-    call videoWriteStr                          ; Print the buffer that is now padded
-
-    pop es                                      ; Restore registers
-    pop ds
-    pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    
-    ret
-
-  .buffer1 times 32 db 0
-  .buffer2 times 32 db 0
-    
+        
 ;---------------------------------------------------
 videoWriteNumPadding32:
 ;
-; Converts a number and base to a string.
+; Write a 32-bit number into video memory with padding.
 ;
 ; Expects: AX:DX = Number to display
 ;          BX    = Base of number
@@ -398,6 +290,17 @@ videoWriteNumPadding32:
     mov si, .buffer2                            ; Print the buffer that is now padded
     call videoWriteStr
 
+    mov si, .buffer1                            ; Finally, take both buffers
+    mov di, .buffer2                            ; and clear them for further usage
+    mov cx, 32
+    
+  .zeroLoop:
+    mov byte [ds:si], 0
+    mov byte [es:di], 0
+    inc si
+    inc di
+    loop .zeroLoop
+    
     pop es                                      ; Restore registers
     pop ds
     pop di
@@ -411,7 +314,129 @@ videoWriteNumPadding32:
 
   .buffer1 times 32 db 0
   .buffer2 times 32 db 0
+
+;---------------------------------------------------
+videoWriteNumPadding:
+;
+; Write a 16-bit number into video memory with padding.
+;
+; Expects: AX    = Number to display
+;          BX    = Base of number
+;          CL    = Char to pad with
+;          CH    = Padding length
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push dx                                     ; Save register
+
+    xor dx, dx                                  ; We only want a 16-bit number
+    call videoWriteNumPadding32                 ; Now print out the number
+
+    pop dx                                      ; Restore register
+    ret
+
+;---------------------------------------------------
+videoWriteNum32:
+;
+; Write a 32-bit number into video memory.
+;
+; Expects: AX:DX = Number to display
+;          BX    = Base of number
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push cx                                     ; Save register
+
+    xor cx, cx                                  ; We dont want padding
+    call videoWriteNumPadding32                 ; Now print out the 32-bit number
+
+    pop cx                                      ; Restore register
+    ret
     
+;---------------------------------------------------
+videoWriteNum:
+;
+; Write a 16-bit number into video memory.
+;
+; Expects: AX    = Number to display
+;          BX    = Base of number
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push cx                                     ; Save registers
+    push dx
+
+    xor dx, dx                                  ; We only want a 16-bit number
+    xor cx, cx                                  ; We dont want padding
+    call videoWriteNumPadding32                 ; Now print out the number
+
+    pop dx                                      ; Restore registers
+    pop cx
+    ret
+       
+;---------------------------------------------------
+videoScroll:
+;
+; Scroll the screen up one line, if cursor is on the
+; last available line.
+;    
+; Expects: Nothing
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push di
+    push es
+    push ds
+
+    mov ax, cs                                  ; Set the data segment to the code segment
+    mov ds, ax                                  ; This is to ensure correct data refrences 
+
+    cmp byte [curY], 25                         ; See if scrolling the screen is even needed
+    jnge .done
+    
+    mov ax, VIDEO_MEMORY_SEG                    ; Video memory segment
+    mov es, ax
+
+    mov di, 0*(80*2)                            ; Take the top line 
+    
+  .moveLine:
+    mov ax, word [es:di+80*2]                   ; Grab a byte from es:di + size of char * screen width
+    mov word [es:di], ax                        ; Shove the byte to the top line into es:di
+
+    inc di                                      ; Increase the video memory offset
+    
+    cmp di, 25*(80*2)                           ; Continue untill everything has been moved up by one
+    jl .moveLine
+    
+
+    mov di, 24*(80*2)                           ; This is the bottom line
+    
+  .clearLine:
+    mov ah, byte [color]                        ; Grab the current text color
+    mov al, ' '                                 ; Fill with a whitespace
+    
+    mov word [es:di], ax                        ; Shove the byte to the bottom line in es:di
+
+    add di, 2                                   ; Increase the video memory offset
+    
+    cmp di, 25*(80*2)                           ; Continue untill the bottom line is cleared
+    jle .clearLine
+    
+    mov byte [curY], 24                         ; Decrease the cursor ypos
+
+  .done:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop ax
+
+    ret 
+
 ;---------------------------------------------------
 videoClearScreen:
 ;
@@ -434,11 +459,11 @@ videoClearScreen:
     mov ax, cs                                  ; Set the data segment to the code segment
     mov ds, ax                                  ; This is to ensure correct data refrences     
 
-    mov ax, 0xb800                              ; Video memory segment
-    mov es, ax 
+    mov di, VIDEO_MEMORY_SEG                    ; Video memory segment
+    mov es, di 
+    mov di, VIDEO_MEMORY_OFF                    ; Video memory offset
 
     cld                                         ; Clear direction flag
-    xor di, di                                  ; Video memory offset
     mov cx, 2000                                ; Times to reapeat
     mov ah, byte [color]                        ; Set current color
     mov al, ' '                                 ; Fill with blank spaces
@@ -459,7 +484,7 @@ videoClearScreen:
     ret
     
 ;---------------------------------------------------
-saveScreen:
+videoSaveScreen:
 ;
 ; Save the contents of the screen into memory.
 ;    
@@ -478,9 +503,9 @@ saveScreen:
     push es
 
     cld                                         ; Clear direction flag
-    mov si, 0xb800                              ; Video memory segment
-    mov ds, si
-    xor si, si                                  ; Video memory offset
+    mov si, VIDEO_MEMORY_SEG                    ; Video memory segment
+    mov ds, si 
+    mov si, VIDEO_MEMORY_OFF                    ; Video memory offset
 
     mov di, cs                                  ; Current segment
     mov es, di
@@ -501,7 +526,7 @@ saveScreen:
     ret
     
 ;---------------------------------------------------
-restoreScreen:
+videoRestoreScreen:
 ;
 ; Restore the contents of the screen from memory.
 ;    
@@ -520,9 +545,9 @@ restoreScreen:
     push es
 
     cld                                         ; Clear direction flag
-    mov di, 0xb800                              ; Video memory segment
-    mov es, di
-    xor di, di                                  ; Video memory offset
+    mov di, VIDEO_MEMORY_SEG                    ; Video memory segment
+    mov es, di 
+    mov di, VIDEO_MEMORY_OFF                    ; Video memory offset
 
     mov si, cs                                  ; Current segment
     mov ds, si

@@ -4,5 +4,7 @@
 *.elf
 bin/*
 obj/*
+src/inc
 floppy - Copy.img
 floppy.img.bak
+floppy.img

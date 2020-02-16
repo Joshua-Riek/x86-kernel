@@ -18,6 +18,22 @@
 ;
 
 ;---------------------------------------------------
+; String functions
+;---------------------------------------------------
+;
+; itoa IN=> AX:DX=32 bit number, BX=Base, DS:SI=Ptr to buffer
+; atoi IN=> BX=Base, DS:SI=Ptr to str; OUT=> AX=Number
+; convertFilename83 IN=> DS:SI=Ptr to name, ES:DI=Ptr to buffer
+; padStr IN=> AL=Pad char, CX=Length, DS:SI=Ptr to str, ES:DI=Ptr to buffer
+; parseStr IN=> DS:SI=Ptr to str; OUT=> AX=Token, BX=Token, CX=Token, DX=Token
+; findSpace IN=> DS:SI=Ptr to str; OUT=> DS:SI=Ptr to space, CF
+; findStr IN=> DS:SI=Ptr to str; OUT=> DS:SI=Ptr to next str, CF
+; strCmp IN=> DS:SI=Ptr to str, ES:DI=Ptr to str; OUT=> CF
+; strLen IN=> DS:SI=Ptr to str; OUT=> CX=Length
+; charToLower IN=> AL=Char; OUT=> AL=Uppercase char
+; charToUpper IN=> AL=Char; OUT=> AL=Lowercase char
+
+;---------------------------------------------------
 itoa:
 ;
 ; Converts a 32-bit number and base to a string.
@@ -35,9 +51,13 @@ itoa:
     push dx
     push si
     push di
+    push es
 
-    mov word [cs:.hiWord], dx                   ; Save the high word of the number
-    mov word [cs:.loWord], ax                   ; Save the low word of the number
+    mov cx, cs
+    mov es, cx
+
+    mov word [es:.hiWord], dx                   ; Save the high word of the number
+    mov word [es:.loWord], ax                   ; Save the low word of the number
 
     mov di, .baseDigits                         ; Pointer to the base digits
 
@@ -50,12 +70,12 @@ itoa:
 
   .while:                                       ; Repeat untill number in ax is zero
     xor dx, dx                                  ; Zero out the remander
-    mov ax, word [cs:.hiWord]                   ; Fill ax with the high word of the 32-bit number
+    mov ax, word [es:.hiWord]                   ; Fill ax with the high word of the 32-bit number
     div bx                                      ; Divide
-    mov word [cs:.hiWord], ax                   ; Store the high word 
-    mov ax, word [cs:.loWord]                   ; Fill ax with the low word of the 32-bit number
+    mov word [es:.hiWord], ax                   ; Store the high word 
+    mov ax, word [es:.loWord]                   ; Fill ax with the low word of the 32-bit number
     div bx                                      ; Divide
-    mov word [cs:.loWord], ax                   ; Store the low word
+    mov word [es:.loWord], ax                   ; Store the low word
     inc cx                                      ; Increase the counter register
     push dx                                     ; Push the number onto the stack
     cmp ax, 0                                   ; Is ax zero? If not jump back to .while
@@ -66,7 +86,7 @@ itoa:
 
     push bx
     mov bx, dx
-    mov al, byte [cs:di+bx]                     ; Use dx as an index into di (baseDigits)
+    mov al, byte [es:di+bx]                     ; Use dx as an index into di (baseDigits)
     mov byte [ds:si], al
     inc si
     pop bx
@@ -77,7 +97,8 @@ itoa:
     mov byte [ds:si], bl                        ; Zero terminate the string
     inc si
 
-    pop di                                      ; Restore registers
+    pop es                                      ; Restore registers
+    pop di
     pop si
     pop dx
     pop cx
@@ -87,6 +108,9 @@ itoa:
     ret
 
   .zero:
+    cmp dx, 0                                   ; Number must not be zero
+    jne .while
+    
     mov al, '0'
     mov byte [ds:si], al
     inc si
@@ -95,7 +119,8 @@ itoa:
     mov byte [ds:si], bl
     inc si
 
-    pop di                                      ; Restore registers
+    pop es                                      ; Restore registers
+    pop di
     pop si
     pop dx
     pop cx
@@ -179,7 +204,7 @@ atoi:
 ;---------------------------------------------------
 convertFilename83:
 ;
-;  Convert the filename into a fat formatted
+; Convert the filename into a fat formatted
 ; filename (8.3 format).
 ;
 ; Expects: DS:SI = Filename to convert
@@ -198,7 +223,36 @@ convertFilename83:
     call strLen                                 ; Get the length of the string in si
     cmp cx, 0                                   ; See if the string is empty (like my soul)
     jz .error
-    
+
+    xor cx, cx                                  ; Handle the first 8 chars
+
+.dot:
+    mov al, byte [ds:si]
+    cmp al, '.'
+    jne .copyFilename
+
+    lodsb
+    stosb                                       ; If not, store it into the tmp string
+    inc cx                                      ; Increase counter
+
+    mov ax, word [ds:si]
+    cmp word [ds:si], 0x002e                              ; '..'
+    je .2dot
+
+    cmp byte [ds:si], 0                                   ; '.'
+    jne .b
+
+    lodsb
+
+    jmp .padExt
+.2dot:
+    lodsb
+    stosb
+    lodsb
+    inc cx
+
+jmp .padExt
+.b:
     xor cx, cx                                  ; Handle the first 8 chars
   .copyFilename:
     lodsb                                       ; Load the a byte from si
@@ -212,8 +266,8 @@ convertFilename83:
     cmp cx, 8                                   ; Ensure that their is an extension
     jg .padExt2
     jmp .copyFilename
-
-  .extFound:
+ 
+  .extFound:   
     cmp cx, 8                                   ; Check to see if padding is needed
     je .copyExt
 
@@ -333,11 +387,12 @@ padStr:
     ret
     
 ;---------------------------------------------------
-parseString:
+parseStr:
 ;
 ; Split the string into tokens.
 ;
 ; Expects: DS:SI = String to parse
+;             AH = Char to split
 ;
 ; Returns: AX    = Pointer to first string
 ;          BX    = Pointer to second string
@@ -347,21 +402,26 @@ parseString:
 ;---------------------------------------------------
     push si                                     ; Pointer to string
     
-    xor ax, ax                                  ; Clear return values
+    xor al, al                                  ; Clear return values
     xor bx, bx
     xor cx, cx
     xor dx, dx
     
     call findSpace                              ; See if the first string starts with a space
-    jc .done
+    jc .none
+
+    mov dh, ah                                  ; Char to split 
     
     dec si
     mov ax, si                                  ; First string token (AX = "FOO")
     inc si
     
     push ax                                     ; Save the first token on the stack
-
-    call findString                             ; Attempt to find text in the string
+    
+    mov ah, dh
+    xor dh, dh
+    
+    call findStr                                ; Attempt to find text in the string
     jc .finish
     call findSpace                              ; Attempt to find another space between the text
     jc .finish
@@ -369,8 +429,8 @@ parseString:
     dec si
     mov bx, si                                  ; Second string token (BX = "OwO")
     inc si
-    
-    call findString                             ; Attempt to find text in the string
+
+    call findStr                                ; Attempt to find text in the string
     jc .finish
     call findSpace                              ; Attempt to find another space between the text
     jc .finish
@@ -379,7 +439,7 @@ parseString:
     mov cx, si                                  ; Third string token (CX = "BAZ")
     inc si
     
-    call findString                             ; Attempt to find text in the string
+    call findStr                                ; Attempt to find text in the string
     jc .finish
     call findSpace                              ; Attempt to find another space between the text
     jc .finish
@@ -388,7 +448,7 @@ parseString:
     mov dx, si                                  ; Fourth string token (DX = "UwU")
     inc si
     
-    call findString                             ; Attempt to find text in the string
+    call findStr                                ; Attempt to find text in the string
     jc .finish
     
   .finish:
@@ -396,7 +456,11 @@ parseString:
 
   .done:
     pop si                                      ; Restore string pointer
-    
+    ret
+
+  .none:
+    pop si                                      ; Restore string pointer
+    xor ah, ah
     ret
 
 ;---------------------------------------------------
@@ -415,7 +479,7 @@ findSpace:
     inc si
     cmp al, 0                                   ; Check for the end of the string
     je .end
-    cmp al, ' '                                 ; Check for a space
+    cmp al, ah                                  ; Check for a space
     je findSpace
 
     clc
@@ -426,7 +490,7 @@ findSpace:
     ret
     
 ;---------------------------------------------------
-findString:
+findStr:
 ;
 ; Find the next string.
 ;
@@ -441,8 +505,8 @@ findString:
     inc si
     cmp al, 0                                   ; Check for the end of the string
     je .end
-    cmp al, ' '                                 ; Check for a space
-    jne findString
+    cmp al, ah                                 ; Check for a space
+    jne findStr
     dec si
     mov byte [ds:si], 0                         ; Terminate with a zero
     inc si
@@ -472,7 +536,8 @@ strCmp:
     push di
 
     xor ax, ax
-    mov bx, ax
+    xor bx, bx
+    
   .cmp:
     mov al, byte [ds:si]                        ; Byte from si
     mov bl, byte [es:di]                        ; Byte from di

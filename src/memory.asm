@@ -32,7 +32,23 @@
     loMemUsedBlocks dw 0
     loMemMapSeg     dw 0
     loMemMapOff     dw 0
-    kernelSize      dw 0x4000
+    kernelSize      dw 0x6000
+    
+;---------------------------------------------------
+; Memory functions
+;---------------------------------------------------
+;
+; memBytesToBlocks32 IN=> AX:DX=Hi:Lo; OUT=> BX=Blocks
+; memBlockToAddress IN=> CX=Block; OUT=> ES:DI=SEG:OFF
+; memAddressToBlock IN=> ES:DI=SEG:OFF; OUT=> CX=Block
+; memAllocNextBlock IN=> None; OUT=> ES:DI=SEG:OFF, CF
+; memAllocBlocks IN=> BX=Blocks; OUT=> ES:DI=SEG:OFF, CF
+; memAllocBytes IN=> AX:DX=Hi:Lo; OUT=> ES:DI=SEG:OFF, CF
+; memFreeBlock IN=> ES:DI=SEG:OFF; OUT=> None
+; memFreeBlocks IN=> ES:DI=SEG:OFF, BX=Blocks; OUT=> None
+; memFreeBytes IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CF
+; allocMemAddress IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CF
+
     
 ;---------------------------------------------------
 setupMemory:
@@ -53,7 +69,7 @@ setupMemory:
     push di
     push ds
     push es
-    
+
     mov ax, cs                                  ; Set the data segment to the code segment
     mov ds, ax                                  ; This is to ensure correct data refrences     
     
@@ -73,25 +89,37 @@ setupMemory:
     mov bx, BLOCK_SIZE                          ; Get the block size 
     mul bx                                      ; Multiply back to the value
 
-    mov dx, ax                                  ; Offset for bitmap location
-    mov ax, es                                  ; Segment for bitmap location
+    mov di, ax                                  ; Offset for bitmap location
+    ;mov ax, es                                  ; Segment for bitmap location
 
-    mov word [loMemMapOff], dx                  ; Save the bitmap location
-    mov word [loMemMapSeg], ax
+    mov word [loMemMapOff], di                  ; Save the bitmap location
+    mov word [loMemMapSeg], es
 
-    mov bx, word [loMemMaxBlocks]               ; Allocate the bitmap into memory
+    xor ax, ax
+    mov dx, word [loMemMaxBlocks]               ; Allocate the bitmap into memory
     call allocMemAddress
     jc .error
-
-    mov bx, 0x1000                              ; Allocate the bios data area into memory
-    mov ax, 0x0000                              ; Segment
-    mov dx, 0x0000                              ; Offset
+                                                ; Allocate the bios data area into memory
+    mov ax, 0x0000                              ; Size hi
+    mov dx, 0x1000                              ; Size lo
+    mov di, 0x0000                              ; Offset
+    mov es, di                                  ; Segment
     call allocMemAddress
     jc .error
-
-    mov bx, word [kernelSize]                   ; Allocate the kernel into memory
-    mov ax, es                                  ; Segment
-    mov dx, KERNEL_OFF                          ; Offset
+                                                ; Allocate the stack location into memory
+    mov ax, 0x0000                              ; Size hi
+    mov dx, 0x1000                              ; Size lo
+    mov di, 0x0000
+    mov es, di                                  ; Segment
+    mov di, 0xf000                              ; Offset
+    call allocMemAddress
+    jc .error
+                                                ; Allocate the kernel into memory
+    mov ax, 0x0000                              ; Size hi
+    mov dx, word [kernelSize]                   ; Size lo
+    mov di, ds
+    mov es, di                                  ; Segment
+    mov di, KERNEL_OFF                          ; Offset
     call allocMemAddress
     jc .error
     
@@ -166,9 +194,14 @@ memBytesToBlocks32:
     push ax                                     ; Save registers
     push cx
     push dx
+
+    xor cx, cx
+    xchg cx, dx
     
-    mov bx, BLOCK_SIZE                          ; Divide by block size in bytes
-    div bx
+    mov bx, BLOCK_SIZE                          ; Take the hi word in ax
+    div bx                                      ; And divide by bx
+    xchg ax, cx                                 ; Handle the lo word
+    div bx                                      ; Divide again by bx
     
     or dx, dx                                   ; Test for remander
     jz .roundUp                                 ; Jump if zero flag set
@@ -185,30 +218,38 @@ memBytesToBlocks32:
 ;---------------------------------------------------
 memBlockToAddress:
 ;
-; Convert the block into a segment
-; and offset address.
+; Convert the block into a segment and offset address.
 ;
 ; Expects:    CX = Block
 ;
-; Returns: AX:DX = Segment:Offset
+; Returns: ES:DI = Segment:Offset
 ;
 ;---------------------------------------------------
-    push cx                                     ; Save register
+    push ax                                     ; Save registers
+    push cx
+    push dx
     
+    xor ax, ax
+    mov es, ax                                  ; Clear segment output register
+    mov di, ax                                  ; Clear offset output register
+
+  .loopBlocks: 
     clc
-    xor ax, ax                                  ; Clear segment output register
-    xor dx, dx                                  ; Clear offset output register
-
-  .loopBlocks:
-    add dx, BLOCK_SIZE                          ; Add the block size to the offset
+    add di, BLOCK_SIZE                          ; Add the block size to the offset
     jnc .nextBlock                              ; Continue to next block if no carry
-    
-    add ah, 0x10                                ; Correct segment for 64k boundry
 
+    push dx
+    mov dx, es
+    add dh, 0x10                                ; Correct segment for 64k boundry
+    mov es, dx
+    pop dx
+    
   .nextBlock:
     loop .loopBlocks 
 
-    pop cx                                      ; Restore register
+    pop dx                                      ; Restore registers
+    pop cx
+    pop ax
     ret
     
 ;---------------------------------------------------
@@ -217,7 +258,7 @@ memAddressToBlock:
 ; Convert the segment and offset into the correct
 ; index into the memory bitmap.
 ;
-; Expects: AX:DX = Segment:Offset
+; Expects: ES:DI = Segment:Offset
 ;
 ; Returns:    CX = Block number/ index
 ;
@@ -226,7 +267,8 @@ memAddressToBlock:
     push bx
     push dx
     
-    push dx                                     ; Save the offset 
+    push di                                     ; Save the offset 
+    mov ax, es                                  ; Deal with the segment first
     
     xor dx, dx                                  ; Clear remander
     mov bx, BLOCK_SIZE                          ; Get the the block size
@@ -248,7 +290,7 @@ memAddressToBlock:
     pop bx
     pop ax
     ret
-   
+
 ;---------------------------------------------------   
 memAllocNextBlock:
 ;
@@ -256,15 +298,15 @@ memAllocNextBlock:
 ;    
 ; Expects:  None
 ;
-; Returns: AX:DX = Segment:Offset
+; Returns: ES:DI = Segment:Offset
 ;          CF    = Set on error
 ;
 ;---------------------------------------------------
-    push bx                                     ; Save registers
+    push ax                                     ; Save registers
+    push bx
     push cx
+    push dx
     push si
-    push di
-    push es
     push ds
 
     mov cx, cs
@@ -294,11 +336,11 @@ memAllocNextBlock:
 
   .error:
     pop ds                                      ; Restore registers
-    pop es
-    pop di
     pop si
+    pop dx
     pop cx
     pop bx
+    pop ax
 
     stc                                         ; Return carry on error
     ret
@@ -310,15 +352,15 @@ memAllocNextBlock:
     call memBlockToAddress                      ; Get the return address for ax:dx
     
     pop ds                                      ; Restore registers
-    pop es
-    pop di
     pop si
+    pop dx
     pop cx
     pop bx
+    pop ax
 
     clc                                         ; No error, so clear carry
     ret
-
+     
 ;---------------------------------------------------   
 memAllocBlocks:
 ;
@@ -326,15 +368,15 @@ memAllocBlocks:
 ;    
 ; Expects: BX    = Blocks to allocate
 ;
-; Returns: AX:DX = Segment:Offset
+; Returns: ES:DI = Segment:Offset
 ;          CF    = Set on error
 ;
 ;---------------------------------------------------
-    push bx                                     ; Save registers
+    push ax                                     ; Save registers
+    push bx
     push cx
+    push dx
     push si
-    push di
-    push es
     push ds
 
     mov cx, cs
@@ -385,11 +427,11 @@ memAllocBlocks:
 
   .error:
     pop ds                                      ; Restore registers
-    pop es
-    pop di
     pop si
+    pop dx
     pop cx
     pop bx
+    pop ax
 
     stc                                         ; Return carry on error
     ret
@@ -408,60 +450,60 @@ memAllocBlocks:
     call memBlockToAddress                      ; Get the return address for ax:dx
 
     pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop si
-    pop cx
-    pop bx
-
-    clc                                         ; No error, so clear carry
-    ret
-
-;---------------------------------------------------   
-memFreeBlocks:
-;
-; Free x ammount of blocks.
-;    
-; Expects: AX:DX = Segment:Offset
-;             BX = Blocks to free
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    push es
-    push ds
-
-    mov cx, cs
-    mov ds, cx
-    
-    mov di, word [loMemMapSeg]                  ; Set correct segment for memory map location
-    mov es, di
-    mov di, word [loMemMapOff]                  ; Set correct offset for memory map location
-    call memAddressToBlock                      ; Convert address to block index
-    
-    add di, cx                                  ; Add block index to offset
-    mov cx, bx                                  ; Blocks to free
-    
-  .free:
-    mov byte [es:di], 0x00                      ; Set the bit to free (0x0)
-    dec word [loMemUsedBlocks]                  ; Decrease the used low memory
-    inc di                                      ; Increase segment offset
-    loop .free
-
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
     pop si
     pop dx
     pop cx
     pop bx
     pop ax
+
+    clc                                         ; No error, so clear carry
+    ret    
+    
+;---------------------------------------------------   
+memAllocBytes:
+;
+; Allocate the next available blocks.
+;    
+; Expects: AX:DX = Size in bytes
+;
+; Returns: ES:DI = Segment:Offset
+;          CF    = Set on error
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push dx
+
+    call memBytesToBlocks32
+    cmp bx, 0
+    jz .done
+    
+    call memAllocBlocks
+    jc .error
+    
+    pop dx                                      ; Restore registers
+    pop bx
+    pop ax
+
+    push cx
+    mov cl, 0x00
+    call memSet
+    pop cx
+    
+    ;call logAllocMem
+
+  .done:
+    clc                                         ; No error, so clear carry
+    ret
+
+  .error:
+    pop dx                                      ; Restore registers
+    pop ax
+    pop dx
+    pop bx
+    pop ax
+    
+    stc                                         ; Return carry on error
     ret
 
 ;---------------------------------------------------   
@@ -485,12 +527,12 @@ memFreeBlock:
 
     mov cx, cs
     mov ds, cx
-    
+
+    call memAddressToBlock                      ; Convert address to block index
+
     mov di, word [loMemMapSeg]                  ; Set correct segment for memory map location
     mov es, di
     mov di, word [loMemMapOff]                  ; Set correct offset for memory map location
-
-    call memAddressToBlock                      ; Convert address to block index
     add di, cx                                  ; Add block index to offset
 
     mov byte [es:di], 0x00                      ; Set the bit to free (0x0)
@@ -505,14 +547,92 @@ memFreeBlock:
     pop bx
     pop ax
     ret
+ 
+;---------------------------------------------------   
+memFreeBlocks:
+;
+; Free x ammount of blocks.
+;    
+; Expects: ES:DI = Segment:Offset
+;             BX = Blocks to free
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov cx, cs
+    mov ds, cx
+
+    call memAddressToBlock                      ; Convert address to block index
+        
+    mov di, word [loMemMapSeg]                  ; Set correct segment for memory map location
+    mov es, di
+    mov di, word [loMemMapOff]                  ; Set correct offset for memory map location
+    add di, cx                                  ; Add block index to offset
+    
+    mov cx, bx                                  ; Blocks to free
+    
+  .free:
+    mov byte [es:di], 0x00                      ; Set the bit to free (0x0)
+    dec word [loMemUsedBlocks]                  ; Decrease the used low memory
+    inc di                                      ; Increase segment offset
+    loop .free
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+;---------------------------------------------------   
+memFreeBytes:
+;
+; Allocate the next available blocks.
+;    
+; Expects: AX:DX = Size in bytes
+;          ES:DI = Segment:Offset
+;          
+; Returns: CF    = Set on error
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push dx
+    
+    call memBytesToBlocks32
+        cmp bx, 0
+    jz .done
+    
+    mov ax, es
+    mov dx, di
+    call memFreeBlocks
+    
+    pop dx                                      ; Restore registers
+    pop ax
+
+    ;call logFreeMem
+.done:
+    clc                                         ; No error, so clear carry
+    ret
     
 ;---------------------------------------------------
 allocMemAddress:
 ;
 ; Allocate an memory address in size of bytes.
 ;
-; Expects: AX:DX = Segment:Offset
-;             BX = Size in bytes
+; Expects: ES:DI = Segment:Offset
+;          AX:DX = Size in bytes (Hi:Lo)
 ;
 ; Returns:    CF = Set on error
 ;
@@ -525,17 +645,18 @@ allocMemAddress:
     push di
     push es
     push ds
+
+    call memAddressToBlock                      ; Convert address to block/ index
+    call memBytesToBlocks32                     ; Convert size in bytes to size in blocks
     
-    mov cx, cs
-    mov ds, cx
+    mov ax, cs
+    mov ds, ax
     
     mov di, word [loMemMapSeg]                  ; Set segment to memory map location
     mov es, di
     mov di, word [loMemMapOff]                  ; Set offset into memory map
-    call memAddressToBlock
-    call memBytesToBlocks
-    
-    mov dx, ax                                  ; Size to allocate
+
+    mov dx, bx                                  ; Size to allocate
     mov ax, cx                                  ; Restore the bitmap index
     
     mov cx, word [loMemMaxBlocks]
@@ -571,6 +692,7 @@ allocMemAddress:
     inc word [loMemUsedBlocks]                  ; Increase the used low memory
     inc di                                      ; Increase segment offset
     loop .setBits
+    
 
     pop ds                                      ; Restore registers
     pop es
@@ -581,6 +703,8 @@ allocMemAddress:
     pop bx
     pop ax
 
+    ;call logAllocMem
+    
     clc                                         ; Clear carry on no error
     ret
     
@@ -600,4 +724,54 @@ allocMemAddress:
     
     stc                                         ; Set carry on error
     ret
+memSet:
+; Expects: AX:DX = Size in bytes
+;          ES:DI = Segment:Offset
+;             CL = The value to fill
+;
+;
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+        
+  .readBytes:
+    mov byte [es:di], cl
 
+    clc
+    add di, 1                                   ; Increaese the pointer, buffer fix
+    jnc .nextByte 
+
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+    
+  .nextByte:
+    dec dx
+    
+    cmp dx, 0                                   ; Decrease counter and see if we are at the end
+    jne .readBytes
+    cmp ax, 0
+    je .done
+
+    sub ax, 1
+    mov dx, 0xffff
+    jmp .nextByte
+.done:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    ret

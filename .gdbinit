@@ -485,3 +485,103 @@ define step_until_code
   set $SHOW_CONTEXT = 1
   context
 end
+
+define wb
+  set $_var = $arg0
+  watch *(unsigned char*) $_var
+end
+document wb
+Set a watchpoint at the variable passed, size of a byte.
+Usage: wb var
+end
+
+define ww
+  set $_var = $arg0
+  watch *(unsigned short int*) $_var
+end
+document ww
+Set a watchpoint at the variable passed, size of a word.
+Usage: ww var
+end
+
+define wd
+  set $_var = $arg0
+  watch *(unsigned int*) $_var
+end
+document wd
+Set a watchpoint at the variable passed, size of a double word.
+Usage: wd var
+end
+
+
+define printb
+  if $argc != 1
+    help printb
+  else
+    printf "0x%02x\n", *(unsigned char*) $arg0
+  end
+end
+document printb
+Print out VAR, size of a byte.
+Usage: printb VAR
+end
+
+define pb
+  if $argc != 1
+    help printb
+  else
+    printb $arg0
+  end
+end
+document pb
+Print out VAR, size of a byte.
+Usage: pb VAR
+end
+
+define printw
+  if $argc != 1
+    help printw
+  else
+    printf "0x%04x\r\n", *(unsigned short int*) $arg0
+  end
+end
+document printw
+Print out VAR, size of a word.
+Usage: printw VAR
+end
+
+define pw
+  if $argc != 1
+    help printw
+  else
+    printw $arg0
+  end
+end
+document pw
+Print out VAR, size of a word.
+Usage: pw VAR
+end
+
+define printd
+  if $argc != 1
+    help printd
+  else
+    printf "0x%08x\r\n", *(unsigned int*) $arg0
+  end
+end
+document printd
+Print out VAR, size of a double word.
+Usage: printd VAR
+end
+
+define pd
+  if $argc != 1
+    help printd
+  else
+    printd $arg0
+  end
+end
+document pd
+Print out VAR, size of a double word.
+Usage: pd VAR
+end
