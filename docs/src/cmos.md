@@ -1,4 +1,4 @@
-# Cmos functions
+# Cmos Functions
 
 ### cmosRead
 Read the contents from a chosen CMOS register
