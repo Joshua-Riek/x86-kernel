@@ -1,13 +1,4 @@
-* [cli](Cli-Functions)
-* [cmos](Cmos-Functions)
-* [disk](Disk-Functions)
-* [fat](Fat-Functions)
-* [kernel](Kernel-Functions)
-* [keyboard](Keyboard-Functions)
-* [memory](Memory-Functions)
-* [serial](Serial-Functions)
-* [string](String-Functions)
-* [video](Video-Functions)
+
 
 ## [Cli Functions](Cli-Functions)
 
