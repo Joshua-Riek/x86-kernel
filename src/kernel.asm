@@ -58,7 +58,7 @@ entryPoint:
     call setupDisk                              ; Setup the disk manager
     jc .diskError
 
-    call setupMemory
+    call setupMemory                            ; Setup the memory manager
 
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
     call videoWriteStr                          ; Write string to standard output
@@ -129,23 +129,3 @@ __GPL_WARRANTY  db "This program is distributed in the hope that it will be usef
                 db "but WITHOUT ANY WARRANTY; without even the implied warranty of", 10, 13,
                 db "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the", 10, 13,
                 db "GNU General Public License for more details.", 10, 13, 0
-
-inits:
-    mov ah, 0
-    mov al, 11100011b
-    int 0x14
-
-    ; AH=bit 7 clear on success
-sendSerial:
-    mov ah, 0x01
-    mov dx, 0
-    int 0x14
-    ret
-    ; AH=bit 7 clear on success
-
-getSerial:
-    mov ah, 0x02
-    mov dx, 0
-    int 0x14
-
-    ret

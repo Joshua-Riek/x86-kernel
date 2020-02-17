@@ -33,7 +33,6 @@
 ; doWarranty IN=> None; OUT=> None
 ; doRedistrib IN=> None; OUT=> None
 ; driveToAscii IN=> DL=Drive; OUT=> AL=Ascii drive letter
-; bcd IN=> AL=Number; OUT=> AL=BCD Number
     
 ;---------------------------------------------------
 ; Cli varables
@@ -658,7 +657,7 @@ doType:
 ;
 ; Command to show the contents of a file.
 ;
-; Expects: BX    = File to remove
+; Expects: BX    = File to show
 ;
 ; Returns: Nothing
 ;
@@ -771,7 +770,7 @@ doType:
 ;---------------------------------------------------   
 doCopy:
 ;
-; Command to show the contents of a file.
+; Command to copy one file to another.
 ;
 ; Expects: BX    = File to copy
 ;          CX    = File to create and write

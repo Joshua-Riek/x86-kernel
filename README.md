@@ -1,6 +1,9 @@
 # SuccOS
  A hobby Operating System developed from scratch using i8086 assembly.
 
+## Documentation 
+Please see [`Function Index`](https://github.com/Joshua-Riek/SuccOS/wiki/Function-Index) for some work in progress documentation.
+
 ## Building source
 Using both Nasm & GCC Cross-Compiler:
 ```sh
@@ -17,8 +20,6 @@ For a full list of changes and updates please see `changelog.org`.
 
 ## License
 Distributed under the GNU General Public License. See `LICENSE` for more information.
-https://github.com/username/repository/blob/master/img
-[link](https://github.com/SpookyVerkauferin/SuccOS/wiki/cmos)
 
 ## Acknowledgements
 * [GCC Cross-Compiler]
