@@ -1,7 +1,7 @@
 *.o
-*.bin
 *.elf
-bin/*
+bin/*.bin
+bin/*.elf
 obj/*
 src/inc
 floppy - Copy.img

@@ -142,9 +142,19 @@
 
 - I plan to do some more looking into CMOS stuff, seems intresting.
 
+* CHANGELOG 1.1.0
+
+
 * Github Wiki
 ** DONE cmos.asm
-** TODO keyboard.asm
+** DONE keyboard.asm
+** DONE video.asm
+** DONE string.asm
+** DONE memory.asm
+** DONE serial.asm
+** TODO disk.asm
+** DONE fat.asm
+** TODO cli.asm
 
 * STUFF
 ** TODO Potental makefile/ ELF updates?

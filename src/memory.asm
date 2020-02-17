@@ -17,38 +17,14 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-;---------------------------------------------------
-; Memory manager contants
-;---------------------------------------------------
-    
     %define BLOCKS_PER_KB 2
     %define BLOCK_SIZE    512
 
-;---------------------------------------------------
-; Memory manager varables
-;---------------------------------------------------
-    
     loMemMaxBlocks  dw 0
     loMemUsedBlocks dw 0
     loMemMapSeg     dw 0
     loMemMapOff     dw 0
     kernelSize      dw 0x6000
-    
-;---------------------------------------------------
-; Memory functions
-;---------------------------------------------------
-;
-; memBytesToBlocks32 IN=> AX:DX=Hi:Lo; OUT=> BX=Blocks
-; memBlockToAddress IN=> CX=Block; OUT=> ES:DI=SEG:OFF
-; memAddressToBlock IN=> ES:DI=SEG:OFF; OUT=> CX=Block
-; memAllocNextBlock IN=> None; OUT=> ES:DI=SEG:OFF, CF
-; memAllocBlocks IN=> BX=Blocks; OUT=> ES:DI=SEG:OFF, CF
-; memAllocBytes IN=> AX:DX=Hi:Lo; OUT=> ES:DI=SEG:OFF, CF
-; memFreeBlock IN=> ES:DI=SEG:OFF; OUT=> None
-; memFreeBlocks IN=> ES:DI=SEG:OFF, BX=Blocks; OUT=> None
-; memFreeBytes IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CF
-; allocMemAddress IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CF
-
     
 ;---------------------------------------------------
 setupMemory:
@@ -84,8 +60,12 @@ setupMemory:
 
     mov bx, word [kernelSize]                   ; Get the kernel size    
     add bx, KERNEL_OFF
-    call memBytesToBlocks                       ; Get the num of blocks to allocate (rounded value)
+    mov dx, bx
+    xor ax, ax
+    call memBytesToBlocks32                     ; Get the num of blocks to allocate (rounded value)
 
+    mov ax, bx
+    
     mov bx, BLOCK_SIZE                          ; Get the block size 
     mul bx                                      ; Multiply back to the value
 
@@ -147,38 +127,7 @@ setupMemory:
     
     stc                                         ; Set carry, error occured
     ret
-    
-;---------------------------------------------------
-memBytesToBlocks:
-;
-; Calculate how many blocks are required to allocate
-; from the size in bytes, note that this
-; value is rounded up if remander.
-;
-; Expects:    BX = Size in bytes
-;
-; Returns:    AX = Rounded up size in blocks
-;
-;---------------------------------------------------
-    push bx                                     ; Save registers
-    push cx
-    push dx
-    
-    xor dx, dx                                  ; Clear remander
-    mov ax, bx                                  ; Grab the size param
-    mov bx, BLOCK_SIZE                          ; Divide by block size in bytes
-    div bx
-    
-    or dx, dx                                   ; Test for remander
-    jz .roundUp                                 ; Jump if zero flag set
-    inc ax                                      ; If remander, add one
-    
-  .roundUp:
-    pop dx                                      ; Restore registers
-    pop cx
-    pop bx
-    ret
-        
+  
 ;---------------------------------------------------
 memBytesToBlocks32:
 ;
@@ -490,7 +439,7 @@ memAllocBytes:
     call memSet
     pop cx
     
-    ;call logAllocMem
+    call logAllocMem
 
   .done:
     clc                                         ; No error, so clear carry
@@ -599,19 +548,19 @@ memFreeBlocks:
 ;---------------------------------------------------   
 memFreeBytes:
 ;
-; Allocate the next available blocks.
+; Free the x ammount of bytes.
 ;    
 ; Expects: AX:DX = Size in bytes
 ;          ES:DI = Segment:Offset
 ;          
-; Returns: CF    = Set on error
+; Returns: Nothing
 ;
 ;---------------------------------------------------
     push ax                                     ; Save registers
     push dx
     
     call memBytesToBlocks32
-        cmp bx, 0
+    cmp bx, 0
     jz .done
     
     mov ax, es
@@ -622,7 +571,7 @@ memFreeBytes:
     pop ax
 
     ;call logFreeMem
-.done:
+  .done:
     clc                                         ; No error, so clear carry
     ret
     
@@ -692,7 +641,6 @@ allocMemAddress:
     inc word [loMemUsedBlocks]                  ; Increase the used low memory
     inc di                                      ; Increase segment offset
     loop .setBits
-    
 
     pop ds                                      ; Restore registers
     pop es
@@ -703,7 +651,7 @@ allocMemAddress:
     pop bx
     pop ax
 
-    ;call logAllocMem
+    call logAllocMem
     
     clc                                         ; Clear carry on no error
     ret

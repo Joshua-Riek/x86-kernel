@@ -17,28 +17,13 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-;---------------------------------------------------
-; Fat functions
-;---------------------------------------------------   
-; 
-; readClustersFAT12:   IN=> ES:DI=SEG:OFF, AX=Cluster; OUT=> CF
-; readClustersFAT16:   IN=> ES:DI=SEG:OFF, AX=Cluster; OUT=> CF
-; readClusters:        IN=> ES:DI=SEG:OFF, AX=Cluster; OUT=> CF
-; removeClustersFAT12: IN=> AX=Cluster; OUT=> CF
-; removeClustersFAT16: IN=> AX=Cluster; OUT=> CF
-; removeClusters:      IN=> AX=Cluster; OUT=> CF
-; writeClustersFAT12:  IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CX=NUM, CF
-; writeClustersFAT16:  IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CX=NUM, CF
-; writeClusters:       IN=> ES:DI=SEG:OFF, AX:DX=Hi:Lo; OUT=> CX=NUM, CF
-;
-    
 ;--------------------------------------------------
 readClustersFAT12:
 ;
 ; Load the FAT12 table into memory, then follow the
 ; cluster chain and load into location es:di.
 ;
-; Please note that this will dynamicly allocate
+; Please note that this will dynamically allocate
 ; and load the entire FAT into memory.
 ;
 ; Expects: ES:DI = Where to load the file
@@ -714,88 +699,7 @@ removeClusters:
     pop ax
     
     ret
-;--------------------------------------------------
-writeClusters:   
-;
-; This is a wrapper function to determine if to
-; use FAT12 or FAT16 when removing clusters.
-;
-;
-; Expects: ES:DI = Location of data
-;          AX:DX = Filesize
-;   
-; Returns:    CX = Cluster
-;             CF = Carry Flag set on error
-;
-;--------------------------------------------------
-    push ax                                     ; Save registers
-    push bx
-    push dx
-    push si
-    push di
-    push es
-    push ds
 
-    push es
-    push di
-    push ax
-    push dx
-    
-    mov dx, cs
-    mov ds, dx
-    
-    mov cx, ax
-
-    cmp word [sectors], 0
-    jne .smallSectors
-
-  .largeSectors:                                ; I have found (when testing a 2GB image)
-    mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
-    mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
-    jmp .calculateTotalClusters
-    
-  .smallSectors:                                ; Normally this value should be used.
-    mov ax, word [sectors]
-    xor dx, dx
-
-   .calculateTotalClusters:
-    clc                                         ; Now we can find the total ammount of clusters
-    xor bh, bh                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
-    mov bl, byte [sectorsPerCluster]
-    sub ax, word [startOfData]
-    jnc .div
-    dec dx
-  .div:
-    div bx
-    
-    xchg cx, ax                                 ; Current cluster number
-
-    pop dx
-    pop ax
-    pop di
-    pop es
-    
-    cmp cx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
-    jbe .FAT12
-
-  .FAT16:
-    call writeClustersFAT16
-    jmp .done
-    
-  .FAT12:
-    call writeClustersFAT12
-
-  .done:
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop si
-    pop dx
-    pop bx
-    pop ax
-    
-    ret
-    
 ;--------------------------------------------------    
 writeClustersFAT12:
 ;
@@ -1444,3 +1348,86 @@ writeClustersFAT16:
   .loadOFF dw 0
   .clustersNeeded dw 0
   .freeClusters times 512 dw 0
+    
+;--------------------------------------------------
+writeClusters:   
+;
+; This is a wrapper function to determine if to
+; use FAT12 or FAT16 when removing clusters.
+;
+;
+; Expects: ES:DI = Location of data
+;          AX:DX = Filesize
+;   
+; Returns:    CX = Cluster
+;             CF = Carry Flag set on error
+;
+;--------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    push es
+    push di
+    push ax
+    push dx
+    
+    mov dx, cs
+    mov ds, dx
+    
+    mov cx, ax
+
+    cmp word [sectors], 0
+    jne .smallSectors
+
+  .largeSectors:                                ; I have found (when testing a 2GB image)
+    mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
+    mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
+    jmp .calculateTotalClusters
+    
+  .smallSectors:                                ; Normally this value should be used.
+    mov ax, word [sectors]
+    xor dx, dx
+
+   .calculateTotalClusters:
+    clc                                         ; Now we can find the total ammount of clusters
+    xor bh, bh                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
+    mov bl, byte [sectorsPerCluster]
+    sub ax, word [startOfData]
+    jnc .div
+    dec dx
+  .div:
+    div bx
+    
+    xchg cx, ax                                 ; Current cluster number
+
+    pop dx
+    pop ax
+    pop di
+    pop es
+    
+    cmp cx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
+    jbe .FAT12
+
+  .FAT16:
+    call writeClustersFAT16
+    jmp .done
+    
+  .FAT12:
+    call writeClustersFAT12
+
+  .done:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop bx
+    pop ax
+    
+    ret
+    

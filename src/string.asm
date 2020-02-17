@@ -18,22 +18,6 @@
 ;
 
 ;---------------------------------------------------
-; String functions
-;---------------------------------------------------
-;
-; itoa IN=> AX:DX=32 bit number, BX=Base, DS:SI=Ptr to buffer
-; atoi IN=> BX=Base, DS:SI=Ptr to str; OUT=> AX=Number
-; convertFilename83 IN=> DS:SI=Ptr to name, ES:DI=Ptr to buffer
-; padStr IN=> AL=Pad char, CX=Length, DS:SI=Ptr to str, ES:DI=Ptr to buffer
-; parseStr IN=> DS:SI=Ptr to str; OUT=> AX=Token, BX=Token, CX=Token, DX=Token
-; findSpace IN=> DS:SI=Ptr to str; OUT=> DS:SI=Ptr to space, CF
-; findStr IN=> DS:SI=Ptr to str; OUT=> DS:SI=Ptr to next str, CF
-; strCmp IN=> DS:SI=Ptr to str, ES:DI=Ptr to str; OUT=> CF
-; strLen IN=> DS:SI=Ptr to str; OUT=> CX=Length
-; charToLower IN=> AL=Char; OUT=> AL=Uppercase char
-; charToUpper IN=> AL=Char; OUT=> AL=Lowercase char
-
-;---------------------------------------------------
 itoa:
 ;
 ; Converts a 32-bit number and base to a string.

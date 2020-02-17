@@ -1,48 +1,35 @@
-;---------------------------------------------------
+;  serial.asm
 ;
-; serial.asm
+;  Handle serial port stuff
+;  Copyright (c) 2017-2020, Joshua Riek
 ;
-; Handle serial port shit.
+;  This program is free software: you can redistribute it and/or modify
+;  it under the terms of the GNU General Public License as published by
+;  the Free Software Foundation, either version 3 of the License, or
+;  (at your option) any later version.
 ;
-; This file is part of the SuccOS C library.
+;  This program is distributed in the hope that it will be useful,
+;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;  GNU General Public License for more details.
 ;
-; Copyright (c) 2017-2018 Joshua Riek. Anyone is free to
-; copy, modify, publish, use, compile, or distribute
-; this software, either in source code form or as a
-; compiled binary and for non-commercial use only.
-; No warranty is given.
+;  You should have received a copy of the GNU General Public License
+;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-;---------------------------------------------------
 
-;---------------------------------------------------
-; Serial contants
-;---------------------------------------------------
-    
 %define COM1 0x3f8 
 %define COM2 0x2f8 
 %define COM3 0x3e8 
 %define COM4 0x2e8
-
-;---------------------------------------------------
-; Serial functions
-;---------------------------------------------------
-;
-; initSerial IN=> None; OUT=> None
-; writeSerial IN=> AL=Data; OUT=> None
-; writeSerialStr IN=> DS:SI=Ptr to str; OUT=> None
-; writeSerialNumPadding32 IN=> AX:DX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
-; writeSerialNumPadding IN=> AX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
-; logAllocMem IN=> None; OUT=> None
-; logFreeMem IN=> None; OUT=> None
     
 ;---------------------------------------------------
 initSerial:
 ;
 ; Setup the serial com ports
 ;
-; Params:  None
+; Expects: Nothing
 ;
-; Returns: None
+; Returns: Nothing
 ;
 ;---------------------------------------------------
     push ax                                     ; Save registers
@@ -50,31 +37,31 @@ initSerial:
     push cx
     push dx
     
-    mov dx, 0x3f8 + 1
+    mov dx, COM1 + 1
     mov al, 0x00                                ; Disable all interrupts
     out dx, al                                  ; Send the data to the port passed
     
-    mov dx, 0x3f8 + 3
+    mov dx, COM1 + 3
     mov al, 0x80                                ; Enable DLAB (set baud rate divisor)
     out dx, al                                  ; Send the data to the port passed
 
-    mov dx, 0x3f8 + 0
-    mov al, 0x03                                ; Set divisor to 3 (lo byte) 
+    mov dx, COM1 + 0
+    mov al, 0x0c                                ; Set divisor to 12 (lo byte) 
     out dx, al                                  ; Send the data to the port passed
     
-    mov dx, 0x3f8 + 1
-    mov al, 0x00                                ; 38400 baud (hi byte)
+    mov dx, COM1 + 1
+    mov al, 0x00                                ; 9600 baud (hi byte)
     out dx, al                                  ; Send the data to the port passed
 
-    mov dx, 0x3f8 + 3
+    mov dx, COM1 + 3
     mov al, 0x03                                ; 8 bits, no parity, one stop bit
     out dx, al                                  ; Send the data to the port passed
 
-    mov dx, 0x3f8 + 2
-    mov al, 0xC7                                ; Enable FIFO, clear them, with 14-byte threshold
+    mov dx, COM1 + 2
+    mov al, 0xc7                                ; Enable FIFO, clear them, with 14-byte threshold
     out dx, al                                  ; Send the data to the port passed
     
-    mov dx, 0x3f8 + 4
+    mov dx, COM1 + 4
     mov al, 0x0b                                ; IRQs enabled, RTS/DSR set
     out dx, al                                  ; Send the data to the port passed
     
@@ -87,9 +74,9 @@ initSerial:
 ;---------------------------------------------------
 writeSerial:
 ;
-; Write some data to the com1 serial port
+; Write some data to the serial port
 ;
-; Params:  AL    = Data
+; Expects: AL    = Data
 ;
 ; Returns: None
 ;
@@ -100,25 +87,60 @@ writeSerial:
     push dx
 
     mov cl, al
-    
+
   .while:
-    mov dx, 0x3f8 + 5
-    in al, dx
+    mov dx, COM1 + 5
+    in al, dx                                   ; Check the Line Status Register
+                                                ; Read the data from the port passed
     and al, 0x20
+    or al, al                                   ; Continue looping untill the transmitter
+    jz .while                                   ; is not doing anything 
 
-    or al, al
-    jz .while
-
-    mov dx, 0x3f8
-    mov al, cl                                  ; Grab the char param
+    mov dx, COM1
+    mov al, cl                                  ; Grab the param
     out dx, al                                  ; Send the data to the port passed
 
     pop dx                                      ; Restore registers
     pop cx
     pop bx
     pop ax
+    
     ret
+    
+;---------------------------------------------------
+readSerial:
+;
+; Read some data from the serial port
+;
+; Expects: AL    = Data
+;
+; Returns: None
+;
+;---------------------------------------------------
+    push bx                                     ; Save registers
+    push cx
+    push dx
 
+    mov ch, ah
+
+  .while:
+    mov dx, COM1 + 5
+    in al, dx                                   ; Check the Line Status Register
+                                                ; Read the data from the port passed
+    and al, 0x01
+    or al, al                                   ; Continue looping untill their is data
+    jz .while                                   ; that can be read
+
+    mov dx, COM1
+    in al, dx                                   ; Read the data from the port passed
+
+    mov ah, ch
+    
+    pop dx                                      ; Restore registers
+    pop cx
+    pop ax
+    
+    ret
     
 ;---------------------------------------------------
 writeSerialStr:
@@ -210,43 +232,7 @@ writeSerialNumPadding32:
 
   .buffer1 times 32 db 0
   .buffer2 times 32 db 0
-    
-;---------------------------------------------------
-writeSerialNumPadding:
-;
-; Write a 16-bit number into serial port with padding.
-;
-; Expects: AX    = Number to display
-;          BX    = Base of number
-;          CL    = Char to pad with
-;          CH    = Padding length
-;
-; Returns: Nothing
-;
-;---------------------------------------------------
-    push dx                                     ; Save register
-
-    xor dx, dx                                  ; We only want a 16-bit number
-    call writeSerialNumPadding32                ; Now print out the number
-
-    pop dx                                      ; Restore register
-    ret
-writeSerialNum32:
-    push cx
-    xor cx, cx
-    call writeSerialNumPadding32
-    pop cx
-    ret
- writeSerialNum:
-    push cx
-    push dx
-    xor cx, cx
-    xor dx, dx
-    call writeSerialNumPadding
-    pop dx
-    pop cx
-    ret
-    
+        
 ;---------------------------------------------------
 logAllocMem:
 ;

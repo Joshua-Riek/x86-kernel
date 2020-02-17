@@ -35,17 +35,6 @@
 %define KEYBOARD_INTERNAL_FLAGS 0x0097          ; Flags for the kbd controller and LED states (AT+ only)
 
 ;---------------------------------------------------
-; BIOS kbd functions
-;---------------------------------------------------
-;
-; kbdFlushBuffer IN=> None; OUT=> None
-; kbdCheckBuffer IN=> None; OUT=> AX=Buffer status
-; kbdCheckBuffer IN=> None; OUT=> AH=Scan code, AL=Ascii code
-; kbdStoreKey IN=> CH=Scan code, CL=Ascii code; OUT=> AX=0 (buff full), AX=1 (stored key)
-; kbdWaitUntillKey IN=> None; OUT=> AH=Scan code, AL=Ascii code
-; kbdCaptureInput IN=> DS:SI=Ptr to buffer
-    
-;---------------------------------------------------
 kbdFlushBuffer:
 ;
 ; Flush the most recent key in the keyboard buffer.

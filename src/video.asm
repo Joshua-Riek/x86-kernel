@@ -17,10 +17,6 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-;---------------------------------------------------
-; Video constants
-;---------------------------------------------------
-    
 %define VIDEO_MEMORY_SEG 0xb800                 ; (VIDEO_MEMORY_SEG  << 4) + VIDEO_MEMORY_OFF  = 0xb8000
 %define VIDEO_MEMORY_OFF 0x0000
     
@@ -40,29 +36,6 @@
 %define LIGHT_MAGENTA    0xd
 %define YELLOW           0xe
 %define WHITE            0xf
-
-;---------------------------------------------------
-; Video functions
-;---------------------------------------------------   
-;
-; setupVideo IN=> None; OUT=> None
-; videoWriteChar IN=> AL=Char; OUT=> None
-; videoWriteStr IN=> DS:SI=Ptr to str; OUT=> None
-; videoWriteNumPadding32 IN=> AX:DX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
-; videoWriteNumPadding IN=> AX=Num, BX=Base, CH=Pad len, CL=Pad char; OUT=> None
-; videoWriteNum32 IN=> AX:DX=Num, BX=Base; OUT=> None
-; videoWriteNum IN=> AX=Num, BX=Base; OUT=> None
-; videoScroll IN=> None; OUT=> None
-; videoClearScreen IN=> None; OUT=> None
-; videoSaveScreen IN=> None; OUT=> None
-; videoRestoreScreen IN=> None; OUT=> None
-; videoUpdateBiosCur IN=> None; OUT=> None
-; videoUpdateCur IN=> None; OUT=> None
-
-       
-;---------------------------------------------------
-; Video varables
-;---------------------------------------------------
 
     curY  db 0                                  ; Cursor Y pos value
     curX  db 0                                  ; Cursor X pos value
