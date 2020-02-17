@@ -17,6 +17,7 @@ For a full list of changes and updates please see `changelog.org`.
 
 ## License
 Distributed under the GNU General Public License. See `LICENSE` for more information.
+[link](spookyverkauferin.github.io/SuccOS/wiki/cmos)
 
 ## Acknowledgements
 * [GCC Cross-Compiler]
