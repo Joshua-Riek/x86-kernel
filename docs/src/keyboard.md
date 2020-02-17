@@ -29,3 +29,5 @@ Wait until a new character and scan code are in the BIOS keyboard buffer
 Get input from the keyboard and fill into the buffer
 * IN: `DS:SI` = Location of input buffer
 * OUT: `DS:SI` = Buffer updated with keys pressed
+
+[Documentation Index](../doc_index.md)

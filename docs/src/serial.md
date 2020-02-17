@@ -24,3 +24,5 @@ Write a string to the serial port (usefull for debugging)
 Write a 32-bit number to the serial port with padding (usefull for debugging)
 * IN: `AX:DX, BX, CH, CL` = Number, Base of number, Padding length, Char to pad with
 * OUT: `Nothing`
+
+[Documentation Index](../doc_index.md)

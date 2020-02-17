@@ -44,3 +44,5 @@ Calculate and write a new set of clusters into FAT16, then follow the created ch
 Determine if to use FAT12 or FAT16, then calculate and write a new set of clusters into FAT, following the created chain of clusters and writing their corresponding data to the disk
 * IN: `ES:DI, AX` = Location of the data to write, 32-bit file size
 * OUT: `CX, CF` = Start of cluster, Carry flag set on error
+
+[Documentation Index](../doc_index.md)

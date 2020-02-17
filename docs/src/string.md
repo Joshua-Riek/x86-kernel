@@ -1,11 +1,12 @@
 # String Functions
+---
 
-### itoa
+# itoa
 Converts a 32-bit number and base to a string
 * IN: `DS:SI, AX:DX, BX` = Pointer to string buffer, 32-bit number, Base of number
 * OUT: `DS:SI` = Pointer now contains a string
 
-### atoi
+# atoi
 Converts a string and base to a 16-bit number
 * IN: `DS:SI, BX` = Pointer to string buffer, Base of number
 * OUT: `AX` = Number from string
@@ -44,3 +45,5 @@ Convert an Acsii letter to a lowercase character
 Convert an Acsii letter to a uppercase character
 * IN: `AL` = Ascii character
 * OUT: `AL` = Uppercase Ascii character
+
+[Documentation Index](../doc_index.md)

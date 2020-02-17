@@ -54,3 +54,5 @@ Free the bytes in memory related to the address
 Manually allocate an address into memory
 * IN: `ES:DI, AX:DX` = Pointer to memory address, size in bytes
 * OUT: `CF` = Carry flag set on error
+
+[Documentation Index](../doc_index.md)
