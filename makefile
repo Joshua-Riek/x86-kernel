@@ -37,7 +37,7 @@ CFLAGS       +=
 LDFLAGS      +=
 ARFLAGS      +=
 LDFLAGS      += -m elf_i386 -Ttext=0x1000
-NASMFLAGS    += -isrc/inc/ -O0 -f elf -g3 -F dwarf
+NASMFLAGS    += -O0 -f elf -g3 -F dwarf
 OBJCOPYFLAGS += -O binary
 
 # Disk image file
@@ -92,7 +92,7 @@ clobber: clean
 
 # Write the kernel to a disk image
 install: 
-	cp $(BINDIR)/1440k.img $(DISKIMG)
+	cp 1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
 	cp $(BINDIR)/kernel.bin B:/kernel.bin
 	imdisk -D -m B:

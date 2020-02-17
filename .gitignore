@@ -1,9 +1,7 @@
 *.o
 *.elf
-bin/*.bin
-bin/*.elf
+bin/*
 obj/*
 src/inc
-floppy - Copy.img
-floppy.img.bak
 floppy.img
+floppy - Copy.img
