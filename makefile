@@ -17,9 +17,9 @@
 #
 
 # Build tools
-CC           ?= i686-elf-gcc
-LD           ?= i686-elf-ld
-AR           ?= i686-elf-ar
+CC           := i686-elf-gcc
+LD           := i686-elf-ld
+AR           := i686-elf-ar
 NASM         ?= nasm
 OBJCOPY      ?= objcopy
 DD           ?= dd
