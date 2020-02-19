@@ -17,9 +17,9 @@
 #
 
 # Build tools
-CC           ?= gcc
-LD           ?= ld
-AR           ?= ar
+CC           ?= i686-elf-gcc
+LD           ?= i686-elf-ld
+AR           ?= i686-elf-ar
 NASM         ?= nasm
 OBJCOPY      ?= objcopy
 DD           ?= dd
@@ -36,23 +36,15 @@ BINDIR        = ./bin
 CFLAGS       +=
 LDFLAGS      +=
 ARFLAGS      +=
-LDFLAGS      += -m elf_i386 -Ttext=0x1000
+LDFLAGS      += -e entryPoint -m elf_i386 -Ttext=0x1000
 NASMFLAGS    += -O0 -f elf -g3 -F dwarf
 OBJCOPYFLAGS += -O binary
 
 # Disk image file
 DISKIMG       = floppy.img
 
-# For Windows compatibility (using an i686-elf cross-compiler)
-ifeq ($(OS), Windows_NT)
-  CC         := i686-elf-gcc
-  LD         := i686-elf-ld
-  AR         := i686-elf-ar 
-endif
-
-
 # Set phony targets
-.PHONY: all clean clobber kernel install debug run
+.PHONY: all clean clobber kernel install-linux install-win debug run
 
 
 # Rule to make targets
@@ -91,15 +83,31 @@ clobber: clean
 # mount B: \b
 
 # Write the kernel to a disk image
-install: 
+install-win: 
 	cp 1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
 	cp $(BINDIR)/kernel.bin B:/kernel.bin
 	imdisk -D -m B:
 
+# Write the kernel to a disk image
+install-linux:
+	cp 1440k.img $(DISKIMG)
+	rm -rf tmp-loop
+
+	mkdir tmp-loop
+	mount -o loop -t vfat $(DISKIMG) tmp-loop
+	cp $(BINDIR)/kernel.bin tmp-loop/
+
+	sleep 0.2
+	unmount tmp-loop || exit
+	rm -rf tmp-loop
+
+# Windows fat16 install
+
 #install:
 #	cp $(BINDIR)/kernel.bin B:/kernel.bin
 #	rawcopy -l -m \\\.\B: $(DISKIMG)
+
 
 # Run the disk image
 run:

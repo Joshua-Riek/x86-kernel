@@ -257,7 +257,7 @@ doDir:
     push es
     push ds
     
-    call loadRootDir                            ; Allocate and load the root dir into memory
+    call loadCwd                                 ; Allocate and load the dir into memory
     jc .loadDirError
 
     push es
@@ -535,7 +535,7 @@ doDir:
     pop dx
     pop ax
     
-    call unloadRootDir
+    call unloadCwd
     
     pop si
     pop ds                                      ; Restore registers

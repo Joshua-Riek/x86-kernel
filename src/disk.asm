@@ -47,8 +47,8 @@ bpbBuffer:
     bytesPerCluster   dw 0
     drive db 0
     cwdCluster dw 0
-    rootSEG dw 0
-    rootOFF dw 0
+    cwdSEG dw 0
+    cwdOFF dw 0
     fatSEG dw 0
     fatOFF dw 0
 
@@ -409,13 +409,14 @@ writeSectors:
     ret
 
 ;--------------------------------------------------
-loadRootDir:
+loadCwd:
 ;
-; This allocates and loads the root dir into memory.
+; This allocates and loads the current working
+; directory into memory.
 ;
 ; Expects: Nothing
 ;
-; Returns: ES:DI = Address of root dir
+; Returns: ES:DI = Address of current working dir
 ;          CF    = Carry Flag set on error
 ;
 ;--------------------------------------------------
@@ -429,16 +430,16 @@ loadRootDir:
     mov ax, cs                                  ; Ensure correct data segment
     mov ds, ax
     
-    call allocRootDir                           ; Allocate the root dir into memory
+    call allocCwd                               ; Allocate the current working dir into memory
     jc .memError
     
-    call readRootDir                            ; Read the root directory
+    call readCwd                                ; Read the current working directory
     jc .readError
 
     mov ax, es
     mov dx, di
-    mov word [rootSEG], ax                      ; Save root segment
-    mov word [rootOFF], dx                      ; Save root offset
+    mov word [cwdSEG], ax                       ; Save current working dir segment
+    mov word [cwdOFF], dx                       ; Save current working dir offset
 
     pop ds                                      ; Restore registers
     pop si
@@ -451,7 +452,7 @@ loadRootDir:
     ret
     
   .readError:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
   .memError:
     pop ds                                      ; Restore registers
@@ -465,9 +466,9 @@ loadRootDir:
     ret
 
 ;--------------------------------------------------
-unloadRootDir:
+unloadCwd:
 ;
-; This unallocates the root dir from memory.
+; This unallocates the dir from memory.
 ;
 ; Expects: Nothing
 ;
@@ -486,10 +487,10 @@ unloadRootDir:
     mov ax, cs                                  ; Ensure correct data segment
     mov ds, ax
     
-    mov ax, word [rootSEG]                      ; Get the root segment
+    mov ax, word [cwdSEG]                       ; Get the dir segment
     mov es, ax
-    mov di, word [rootOFF]                      ; Get the root offset
-    call freeRootDir                            ; Free the root dir from memory
+    mov di, word [cwdOFF]                       ; Get the dir offset
+    call freeCwd                                ; Free the dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -503,10 +504,9 @@ unloadRootDir:
     ret
     
 ;--------------------------------------------------
-readRootDir:
+readCwd:
 ;
-; Load the root directory to the appointed buffer
-; from the the drive param block buffer passed.
+; Load the current working directory into memory.
 ;
 ; Expects: ES:DI = Disk buffer
 ;
@@ -570,10 +570,9 @@ readRootDir:
     ret
 
 ;--------------------------------------------------
-writeRootDir:
+writeCwd:
 ;
-; Write the root directory (pointed by es:di) from
-; memory onto the drive.
+; Write the current working directroy to the disk.
 ;
 ; Expects: ES:DI = Disk buffer
 ;
@@ -677,10 +676,10 @@ writeRootDir:
   .dot db '.', 0
     
 ;--------------------------------------------------
-allocRootDir:
+allocCwd:
 ;
-; Allocate the root dir into the memory map.
-; NOTE: THIS DOES NOT READ THE ROOT DIR INTO MEMORY.
+; Allocate the current dir into the memory map.
+; NOTE: THIS DOES NOT READ THE DIR INTO MEMORY.
 ;
 ; Expects: Nothing
 ;
@@ -725,11 +724,11 @@ allocRootDir:
     ret
          
 ;--------------------------------------------------
-freeRootDir:
+freeCwd:
 ;
-; Free the root dir from use in the memory map.
+; Free the current working dir from use in the memory map.
 ;
-; Expects: ES:DI = Address of root dir
+; Expects: ES:DI = Address of dir
 ;
 ; Returns: Nothing
 ;
@@ -1014,7 +1013,6 @@ allocFat:
 freeFat:    
 ;
 ; Allocate the FAT into the memory map.
-; NOTE: THIS DOES NOT READ FAT INTO MEMORY.
 ;
 ; Expects: ES:DI = Address of FAT
 ;
@@ -1057,7 +1055,7 @@ freeFat:
 ;--------------------------------------------------
 searchDir:
 ;
-; Search through the allready loaded root dir for
+; Search through the allready loaded dir for
 ; a file in 8.3 format.
 ;
 ; Expects: DS:SI = Filename in 8.3 format
@@ -1156,7 +1154,7 @@ changeDir:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
 
     mov si, .tmpName                            ; Search for the file
@@ -1166,7 +1164,7 @@ changeDir:
     mov ax, word [es:di+dirFat.clusterLo]       ; Get the file cluster
     mov bl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
 
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     cmp bl, 0x10                                ; Check to see if its a directory
     jne .notDir
@@ -1186,7 +1184,7 @@ changeDir:
     ret
 
   .fileNotFound:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
     
   .notDir:    
   .loadDirError:
@@ -1286,7 +1284,7 @@ createDir:
 
     call memFreeBytes
     
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
     
     mov bx, es                                  ; Save the current dir offset
@@ -1340,10 +1338,10 @@ createDir:
     mov es, bx
     mov di, dx
     
-    call writeRootDir                           ; Finally, write it to the disk
+    call writeCwd                               ; Finally, write it to the disk
     jc .writeDirError
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -1358,7 +1356,7 @@ createDir:
     ret
 
   .writeDirError:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
   .memoryError:
   .loadDirError:
@@ -1380,9 +1378,9 @@ createDir:
 ;--------------------------------------------------  
 removeDir:
 ; 
-; Attempt to change the current working directory
+; Attempt to remove an empty directory
 ;
-; Expects: DS:SI = Directory to search for
+; Expects: DS:SI = Directory to remove
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1405,7 +1403,7 @@ removeDir:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the root dir
     jc .loadDirError
 
     mov bx, es                                  ; Save the current dir offset
@@ -1425,9 +1423,9 @@ removeDir:
     
     mov es, bx
     mov di, dx
-    call writeRootDir
+    call writeCwd
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     mov ax, cx
     call removeClusters
@@ -1446,7 +1444,7 @@ removeDir:
 
   .fileNotFound:
   .notDir:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
     
   .loadDirError:
     pop ds                                      ; Restore registers
@@ -1490,7 +1488,7 @@ fileSize:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the root dir
     jc .error
         
     mov bx, es                                  ; Save the current dir offset
@@ -1503,7 +1501,7 @@ fileSize:
     mov dx, word [di+dirFat.filesize]           ; Get the size of the file
     mov ax, word [di+dirFat.filesize+2]
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
     
     pop ds                                      ; Restore registers
     pop es
@@ -1516,7 +1514,7 @@ fileSize:
     ret
 
   .fileNotFound:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
   .error:
     xor ax, ax
@@ -1537,7 +1535,7 @@ fileSize:
 ;--------------------------------------------------  
 fileExists:
 ; 
-; Load the root dir and search for a file to see
+; Load the cwd and search for a file to see
 ; if it exists.
 ;
 ; Expects: DS:SI = Filename to search for
@@ -1563,14 +1561,14 @@ fileExists:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the root dir
     jc .error
 
     mov si, .tmpName                            ; Search for the file
     call searchDir
     jc .fileNotFound
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
     
     pop ds                                      ; Restore registers
     pop es
@@ -1585,7 +1583,7 @@ fileExists:
     ret
 
   .fileNotFound:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
   .error:
     pop ds                                      ; Restore registers
@@ -1633,7 +1631,7 @@ createFile:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
     
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the root dir
     jc .error
     
     mov bx, es                                  ; Save the current dir offset
@@ -1688,10 +1686,10 @@ createFile:
     mov es, bx
     mov di, dx
     
-    call writeRootDir                           ; Finally, write it to the disk
-    jc .writeError
+    call writeCwd                               ; Finally, write it to the disk
+    jc .writeDirError
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -1706,8 +1704,8 @@ createFile:
     ret
 
   .noFileEntrys:
-  .writeError:
-    call unloadRootDir                          ; Free the root dir from memory
+  .writeDirError:
+    call unloadCwd                              ; Free the dir from memory
 
   .error:
   .existsError:
@@ -1728,10 +1726,10 @@ createFile:
 ;--------------------------------------------------  
 renameFile:
 ;
-; Rename a file in the root directory.
+; Rename a file in the cwd.
 ;
 ; Expects: DS:SI = Filename to change
-;          DS:DI = New filename
+;          ES:DI = New filename
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1759,7 +1757,7 @@ renameFile:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
     
-    call loadRootDir                            ; Allocate and read the root dir
+    call loadCwd                                ; Allocate and read the dir
     jc .error
     
     mov bx, es                                  ; Save the current dir offset
@@ -1777,10 +1775,10 @@ renameFile:
     mov es, bx                                  ; Set the current dir offset back
     mov di, dx
   
-    call writeRootDir                           ; Finally, write it to the disk
-    jc .writeError
+    call writeCwd                               ; Finally, write it to the disk
+    jc .writeDirError
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
     pop es
@@ -1795,8 +1793,8 @@ renameFile:
     ret
     
   .fileNotFound:    
-  .writeError:
-    call unloadRootDir                          ; Free the root dir from memory
+  .writeDirError:
+    call unloadCwd                              ; Free the dir from memory
 
   .error:
     pop ds                                      ; Restore registers
@@ -1817,7 +1815,7 @@ renameFile:
 ;--------------------------------------------------  
 deleteFile:
 ;
-; Delete a file in the root directory and removes
+; Delete a file in the cwd and removes
 ; all fat clusters relating to the file.
 ;
 ; Expects: DS:AX = Filename to remove
@@ -1843,8 +1841,8 @@ deleteFile:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
     
-    call loadRootDir                            ; Allocate and read the root dir
-    jc .loadRootError
+    call loadCwd                                ; Allocate and read the dir
+    jc .loadDirError
     
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
@@ -1860,10 +1858,10 @@ deleteFile:
     mov es, bx
     mov di, dx
     
-    call writeRootDir                           ; Finally, write it to the disk
+    call writeCwd                               ; Finally, write it to the disk
     jc .writeError1
 
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     cmp ax, 0
     je .done
@@ -1896,9 +1894,9 @@ deleteFile:
     
   .fileNotFound:
   .writeError1:
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
     
-  .loadRootError:
+  .loadDirError:
   .loadFatError:
     pop ds                                      ; Restore registers
     pop es
@@ -1917,7 +1915,7 @@ deleteFile:
 ;--------------------------------------------------  
 readFile:
 ;
-; Create an empty file in the root directory.
+; Read a file from disk and into memory.
 ;
 ; Expects: DS:SI = Filename to read
 ;          ES:DI = Location to load file
@@ -1948,8 +1946,8 @@ readFile:
     pop word [.loadOFF]
     pop word [.loadSEG]
     
-    call loadRootDir                            ; Allocate and read the root dir
-    jc .loadRootError
+    call loadCwd                                ; Allocate and read the dir
+    jc .loadDirError
     
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
@@ -1958,11 +1956,11 @@ readFile:
     call searchDir
     jc .fileNotFound
 
-    mov ax, word [es:di+dirFat.clusterLo]          ; File cluster number
-    mov cx, word [es:di+dirFat.filesize]           ; Get the size of the file
+    mov ax, word [es:di+dirFat.clusterLo]       ; File cluster number
+    mov cx, word [es:di+dirFat.filesize]        ; Get the size of the file
     mov dx, word [es:di+dirFat.filesize+2]
 
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
     cmp cx, 0
     je .done
@@ -1989,9 +1987,9 @@ readFile:
     ret
      
   .fileNotFound:
-    call freeRootDir                            ; Free the root dir from memory
+    call freeCwd                                ; Free the dir from memory
 
-  .loadRootError:
+  .loadDirError:
   .readError:
     pop ds                                      ; Restore registers
     pop es
@@ -2060,8 +2058,8 @@ writeFile:
     call writeClusters
     ;; CALL NEW FUNC HERE
     
-    call loadRootDir                            ; Allocate and read the root dir
-    jc .loadRootError
+    call loadCwd                                ; Allocate and read the dir
+    jc .loadDirError
     
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
@@ -2083,10 +2081,10 @@ writeFile:
     mov es, bx
     mov di, dx
     
-    call writeRootDir                           ; Finally, write it to the disk
-    jc .writeRootError
+    call writeCwd                               ; Finally, write it to the disk
+    jc .writeDirError
     
-    call unloadRootDir                          ; Free the root dir from memory
+    call unloadCwd                              ; Free the dir from memory
 
   .fileZero:   
     pop ds                                      ; Restore registers
@@ -2110,13 +2108,13 @@ writeFile:
     pop ax
     jmp .error
     
-  .writeRootError:
-    call unloadRootDir                          ; Free the root dir from memory
+  .writeDirError:
+    call unloadCwd                              ; Free the dir from memory
     
 .fileExistsError:
 .createFileError:
 .loadFatError:
-.loadRootError:                               ; W FAT, W NEWFILE, W CLUSTERS
+.loadDirError: 
 
 .error:
     pop ds                                      ; Restore registers

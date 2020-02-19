@@ -38,6 +38,7 @@
 ; Kernel entry-point
 ;---------------------------------------------------
 
+global entryPoint
 entryPoint:
     jmp KERNEL_SEG:$+5                          ; Fix the cs:ip registers
 
@@ -65,7 +66,7 @@ entryPoint:
     
     mov si, __GPL_NOTICE                        ; Get the address of the gpl3 header notice
     call videoWriteStr                          ; Write string to standard output
-    
+    call fileTesting
     jmp cliLoop                                 ; Go to the user command line
 
   .hang:
