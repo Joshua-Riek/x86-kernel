@@ -11,7 +11,7 @@ $ git clone https://github.com/Joshua-Riek/SuccOS.git
 $ cd SuccOS/
 $ make
 ```
-Futher details on building can be found on the [Getting Started](Getting-Started) page of the wiki.
+Futher details on building can be found on the [Getting Started](https://github.com/Joshua-Riek/SuccOS/wiki/Getting-Started) page of the wiki.
 
 ## Release History
 For a full list of changes and updates please see the [changelog](https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org).
