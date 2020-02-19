@@ -1,37 +1,21 @@
-# SuccOS
+## SuccOS
  A hobby Operating System developed from scratch using i8086 assembly.
 
 ## Documentation 
-Please see [`Function Index`](https://github.com/Joshua-Riek/SuccOS/wiki/Function-Index) for some work in progress documentation.
+See the [Wiki](https://github.com/Joshua-Riek/SuccOS/wiki) for a work in progress documentation, examples and other information.
 
-## Building source
-Using both Nasm & GCC Cross-Compiler:
-```sh
-make
+## Build
+To build:
 ```
-
-Using only Nasm:
-```sh
-nasm -f bin src/kernel.asm -o obj/kernel.bin
+$ git clone https://github.com/Joshua-Riek/SuccOS.git
+$ cd SuccOS/
+$ make
 ```
+Futher details on building can be found on the [Getting Started](Getting-Started) page of the wiki.
 
 ## Release History
-For a full list of changes and updates please see `changelog.org`.
+For a full list of changes and updates please see the [changelog](https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org).
 
 ## License
-Distributed under the GNU General Public License. See `LICENSE` for more information.
+Distributed under the GNU General Public License. See [LICENSE](https://github.com/Joshua-Riek/SuccOS/blob/master/LICENSE) for more information.
 
-## Acknowledgements
-* [GCC Cross-Compiler]
-* [imdisk]
-* [OSDev]
-* [Nasm]
-* [QEMU]
-
-
-[NASM]:   http://www.nasm.us/index.php
-[GCC Cross-Compiler]: https://wiki.osdev.org/GCC_Cross-Compiler
-
-[QEMU]:   http://www.qemu.org/
-[imdisk]: http://www.ltr-data.se/opencode.html/
-[OSDev]:  http://wiki.osdev.org/Main_Page
