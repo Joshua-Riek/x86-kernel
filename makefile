@@ -62,7 +62,6 @@ $(BINDIR)/kernel.elf: $(OBJDIR)/kernel.o | $(BINDIR)
 
 $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm | $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
-	$(NASM) $(SRCDIR)/demo.asm -f bin -o $(BINDIR)/demo.bin
 
 $(OBJDIR):
 	@mkdir -p $@
@@ -88,7 +87,6 @@ install-win:
 	cp 1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
 	cp $(BINDIR)/kernel.bin B:/kernel.bin
-	cp $(BINDIR)/demo.bin B:/demo.bin
 	imdisk -D -m B:
 
 # Write the kernel to a disk image

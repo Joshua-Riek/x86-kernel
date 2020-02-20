@@ -60,18 +60,26 @@ entryPoint:
     jc .diskError
 
     call setupMemory                            ; Setup the memory manager
-
+    jc .memError
+    
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
-    call videoWriteStr                          ; Write string to standard output
+    call videoWriteStr
     
     mov si, __GPL_NOTICE                        ; Get the address of the gpl3 header notice
-    call videoWriteStr                          ; Write string to standard output
-    call fileTesting
+    call videoWriteStr
+
+    ;call fileTesting
+    
     jmp cliLoop                                 ; Go to the user command line
 
   .hang:
     hlt
     jmp .hang
+    
+  .memError:
+    mov si, .memErrorMsg                         ; Tell the user that their was a mem error
+    call videoWriteStr                           ; Write string to standard output
+    jmp .reboot
     
   .diskError:
     mov si, .diskErrorMsg                       ; Tell the user that their was a disk error
@@ -88,7 +96,8 @@ entryPoint:
     int 0x19                                    ; Reboot the system
 
     hlt
-   
+
+  .memErrorMsg  db "Error while getting the low memory!", 10, 13, 0
   .diskErrorMsg db "Error while loading the bios paramater block!", 10, 13, 0
   .errorMsg     db "The operating system has halted.", 10, 13
                 db "Please press any key to reboot.", 0
