@@ -570,7 +570,7 @@ memFreeBytes:
     pop dx                                      ; Restore registers
     pop ax
 
-    ;call logFreeMem
+    call logFreeMem
   .done:
     clc                                         ; No error, so clear carry
     ret

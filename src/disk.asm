@@ -1498,6 +1498,9 @@ fileSize:
     call searchDir
     jc .fileNotFound
 
+    cmp word [di+dirFat.attributes], 0x10       ; Check to see if its a directory
+    je .fileNotFound
+    
     mov dx, word [di+dirFat.filesize]           ; Get the size of the file
     mov ax, word [di+dirFat.filesize+2]
     

@@ -143,21 +143,23 @@
 - I plan to do some more looking into CMOS stuff, seems intresting.
 
 * CHANGELOG 1.1.0
+- Created a wiki page for *cli.asm*.
+- Created a wiki page for *cmos.asm*.
+- Created a wiki page for *disk.asm*.
+- Created a wiki page for *fat.asm*.
+- Created a wiki page for *kernel.asm*.
+- Created a wiki page for *memory.asm*.
+- Created a wiki page for *serial.asm*.
+- Created a wiki page for *string.asm*.
+- Created a wiki page for *video.asm*.
+- Created a wiki page *Function Index* to list all functions breifly.
+- Created a wiki page *Getting Started* to help people on building this.
 
-
-* Github Wiki
-** DONE cmos.asm
-** DONE keyboard.asm
-** DONE video.asm
-** DONE string.asm
-** DONE memory.asm
-** DONE serial.asm
-** TODO disk.asm
-** DONE fat.asm
-** TODO cli.asm
+* CHANGELOG 1.1.1
+- Function *fileSize* updated to set carry if file is a directory.
+- Function *parseStr* updated to properly handle if only one token is present.
 
 * STUFF
-** TODO Potental makefile/ ELF updates?
-** TODO Create correct time stamps for file write/ creation. 
-** TODO Change all root dir functions to dir, as dir handling now works.
-** TODO Look into serial ports more and make everything look nice.
+- TODO Potental makefile/ ELF updates?
+- TODO Create correct time stamps for file write/ creation. 
+- TODO Look into serial ports more and make everything look nice.

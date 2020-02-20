@@ -376,7 +376,6 @@ parseStr:
 ; Split the string into tokens.
 ;
 ; Expects: DS:SI = String to parse
-;             AH = Char to split
 ;
 ; Returns: AX    = Pointer to first string
 ;          BX    = Pointer to second string
@@ -394,17 +393,12 @@ parseStr:
     call findSpace                              ; See if the first string starts with a space
     jc .none
 
-    mov dh, ah                                  ; Char to split 
-    
     dec si
     mov ax, si                                  ; First string token (AX = "FOO")
     inc si
     
     push ax                                     ; Save the first token on the stack
-    
-    mov ah, dh
-    xor dh, dh
-    
+
     call findStr                                ; Attempt to find text in the string
     jc .finish
     call findSpace                              ; Attempt to find another space between the text
@@ -444,7 +438,6 @@ parseStr:
 
   .none:
     pop si                                      ; Restore string pointer
-    xor ah, ah
     ret
 
 ;---------------------------------------------------
@@ -463,7 +456,7 @@ findSpace:
     inc si
     cmp al, 0                                   ; Check for the end of the string
     je .end
-    cmp al, ah                                  ; Check for a space
+    cmp al, ' '                                  ; Check for a space
     je findSpace
 
     clc
@@ -489,7 +482,7 @@ findStr:
     inc si
     cmp al, 0                                   ; Check for the end of the string
     je .end
-    cmp al, ah                                 ; Check for a space
+    cmp al, ' '                                 ; Check for a space
     jne findStr
     dec si
     mov byte [ds:si], 0                         ; Terminate with a zero
