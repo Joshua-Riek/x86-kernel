@@ -2,7 +2,7 @@
  A hobby Operating System developed from scratch using i8086 assembly.
 
 ## Documentation 
-See the [Wiki](https://github.com/Joshua-Riek/SuccOS/wiki) for a work in progress documentation, examples and other information.
+See the [Wiki](https://github.com/Joshua-Riek/SuccOS/wiki/Function-Index) for a work in progress documentation, examples and other information.
 
 ## Build
 To build:
