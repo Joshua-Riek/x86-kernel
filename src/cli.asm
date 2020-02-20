@@ -1378,8 +1378,95 @@ doLoad:
     
 doDump:
     push si
-    
+    push di
+    push es
+    push ds
 
+    mov si, di                                  ; Start by getting the filesize,
+    call fileSize                               ; also tests to see if the file exists
+    jc .fileNotFound
+    
+    call memAllocBytes
+    jc .memError
+    
+    call readFile                               ; Now we read the file into memory
+    jc .readFailure                             ; Size goes into ax:dx
+
+    push es
+    push ds
+    push ax
+    push dx
+    
+    mov dx, es
+    mov cx, di                                  ; Here i dont want to work with offsets, 
+    shr cx, 1                                   ; so shift it out right 4 times then
+    shr cx, 1                                   ; add that to the segment
+    shr cx, 1
+    shr cx, 1
+    add dx, cx
+    xor cx, cx
+
+    push cs                                     ; Setup a far jump so we can return to the kernel 
+    call .getIp
+  .getIp:                                       ; Use a call to get the current IP
+    pop ax
+    add ax, 8                                   ; We can add 8 to the IP so we return below retf
+    push ax
+    
+    push dx                                     ; The new Code Segment
+    push cx                                     ; The new Instruction Pointer
+    
+    retf                                        ; Far jump to the loaded program!
+
+    pop dx
+    pop ax
+    pop ds
+    pop es
+    call memFreeBytes                           ; Free up the memory
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+    
+  .readFailure:  
+    call memFreeBytes                           ; Free up the memory used on error
+    mov si, readSectorErr
+    call videoWriteStr
+    jmp .error
+    
+  .fileNotFound:
+    mov si, badCommandErr
+    call videoWriteStr
+    jmp .error
+    
+  .memError:
+    mov si, memoryErr
+    call videoWriteStr
+    
+  .error:
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    jmp cliLoop
+
+    
+doDump:
+    push si
+    
+i
     push ds
     push es
 
