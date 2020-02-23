@@ -1,3 +1,7 @@
+---
+layout: default
+footer: _Footer.md
+---
 
 ## Resources
 * [Getting Started](Getting-Started)
