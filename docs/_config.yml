@@ -1,9 +1,0 @@
-theme: jekyll-theme-cayman 
-show_downloads: true
-google_analytics:
-footer:
-  links:
-    - label: "foo"
-      url: "https://twitter.com/mmistakes"
-    - label: "bar"
-      url: "https://github.com/mmistakes"
