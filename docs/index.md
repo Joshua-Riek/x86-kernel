@@ -1,6 +1,12 @@
 ---
 layout: default
-footer: _Footer.md
+---
+output:
+  pdf_document:
+    includes:
+      after_body: footer.tex
+---
+
 ---
 
 ## Resources
@@ -10,6 +16,7 @@ footer: _Footer.md
 * [Changelog](https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org)
 
 [Home] | [Getting Started] | [Function Index] | [Releases] | [Changelog]
+{% include Getting-Started.md %}
 
 [Home]: Home
 [Getting Started]: Getting-Started
