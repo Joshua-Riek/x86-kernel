@@ -9,7 +9,7 @@
 
 
 <div class="footer">
-  <p>[Home] | [Getting Started] | [Function Index] | [Releases] | [Changelog]</p>
+  <p>[Home](index) | [Getting Started](Getting-Started) | [Function Index] | [Releases] | [Changelog]</p>
 </div>
 
 [Home]: Home
