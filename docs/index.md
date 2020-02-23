@@ -1,4 +1,4 @@
-
+# memes
 ## Resources
 * [Getting Started](Getting-Started)
 * [Function Reference](Function-Index)
@@ -6,7 +6,6 @@
 * [Changelog](https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org)
 
 [Home] | [Getting Started] | [Function Index] | [Releases] | [Changelog]
-{% include Getting-Started.md %}
 
 [Home]: Home
 [Getting Started]: Getting-Started
