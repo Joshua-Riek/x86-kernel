@@ -12,3 +12,6 @@
 [Function Index]: Function-Index
 [Releases]: https://github.com/Joshua-Riek/SuccOS/releases/
 [Changelog]: https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org
+<div class="footer">
+  <p>Footer</p>
+</div>
