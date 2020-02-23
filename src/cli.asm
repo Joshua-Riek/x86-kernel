@@ -120,7 +120,7 @@ cliLoop:
 
   .captureInput:
     mov si, cliBuff                             ; Now capture the user input
-    call kbdCaptureInput
+    call kbdCtrlCaptureInput
 
     mov al, 0x0a                                ; Line feed
     call videoWriteChar

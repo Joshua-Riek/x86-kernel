@@ -3,5 +3,6 @@
 bin/*
 obj/*
 src/inc
+src/dos.asm
 floppy.img
 floppy - Copy.img

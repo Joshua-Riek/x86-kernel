@@ -112,9 +112,9 @@ readSerial:
 ;
 ; Read some data from the serial port
 ;
-; Expects: AL    = Data
+; Expects: Nothing
 ;
-; Returns: None
+; Returns: AL    = Data
 ;
 ;---------------------------------------------------
     push bx                                     ; Save registers

@@ -130,6 +130,9 @@ videoWriteChar:
     cmp bl, 0x0d                                ; Is the character a new line?
     je .nl                                      ; If so, make a new line
 
+    cmp bl, 0x08
+    je .bs
+    
     cmp bl, 0x09                                ; Is the character a horizontal tab?
     je .tab                                     ; If so, make a tab
     
@@ -174,7 +177,11 @@ videoWriteChar:
     call videoWriteChar                         ; Write it to the screen cx times
 
     jmp .done
-  
+.bs:
+    cmp byte [curX], 0
+    je .done
+    dec byte [curX]
+    jmp .done
   .lf:
     mov byte [curX], 0                          ; Reset the cursor X pos to zero
     jmp .done

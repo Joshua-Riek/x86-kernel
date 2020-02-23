@@ -61,24 +61,30 @@ entryPoint:
 
     call setupMemory                            ; Setup the memory manager
     jc .memError
-    
+
+    call setupKbdCtrl                           ; Setup the keyboard manager
+    jc .kbdError
+        
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
     call videoWriteStr
     
     mov si, __GPL_NOTICE                        ; Get the address of the gpl3 header notice
     call videoWriteStr
 
-    ;call fileTesting
-    
     jmp cliLoop                                 ; Go to the user command line
 
   .hang:
     hlt
     jmp .hang
     
+  .kbdError:
+    mov si, .kbdErrorMsg                        ; Tell the user that their was a kbd error
+    call videoWriteStr                          ; Write string to standard output
+    jmp .reboot
+
   .memError:
-    mov si, .memErrorMsg                         ; Tell the user that their was a mem error
-    call videoWriteStr                           ; Write string to standard output
+    mov si, .memErrorMsg                        ; Tell the user that their was a mem error
+    call videoWriteStr                          ; Write string to standard output
     jmp .reboot
     
   .diskError:
@@ -97,7 +103,8 @@ entryPoint:
 
     hlt
 
-  .memErrorMsg  db "Error while getting the low memory!", 10, 13, 0
+  .kbdErrorMsg  db "Error preforming the keyboard self test!", 10, 13, 0
+  .memErrorMsg  db "Error while getting the low system memory!", 10, 13, 0
   .diskErrorMsg db "Error while loading the bios paramater block!", 10, 13, 0
   .errorMsg     db "The operating system has halted.", 10, 13
                 db "Please press any key to reboot.", 0
@@ -117,6 +124,7 @@ entryPoint:
 %include "src\test.asm"
 %include "src\fat.asm"
 %include "src\cli.asm"
+;%include "src\dos.asm"
     
 ;---------------------------------------------------
 ; Main kernel varables below
