@@ -170,11 +170,11 @@ setupKbdCtrl:
 ;---------------------------------------------------
 kbdCtrlRead:
 ;
-; Read a byte from the keyboard controler.
+; Read a byte from the keyboard controller.
 ;    
 ; Expects: Nothing
 ;
-; Returns: AL    = Byte from data port
+; Returns: AL    = Byte from read
 ;
 ;--------------------------------------------------- 
   .wait:                                        ; Read from the status port and check the
@@ -193,9 +193,9 @@ kbdCtrlWrite:
 ;
 ; Send a byte to the keyboard controller.
 ;    
-; Expects: Nothing
+; Expects: AL    = Byte to write
 ;
-; Returns: AL    = Byte from data port
+; Returns: Nothing
 ;
 ;---------------------------------------------------
     push dx
@@ -572,7 +572,7 @@ kbdCtrlHandler:
 ;---------------------------------------------------
 kbdEncSendCmd:
 ;
-; Send a command to the keyboard controller.
+; Send a command to the keyboard encoder.
 ;    
 ; Expects: BL    = Command byte
 ;
