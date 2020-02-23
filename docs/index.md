@@ -8,9 +8,9 @@
  
 
 
-<div class="footer">
-  <p>[Home] | [Getting Started] | [Function Index] | [Releases] | [Changelog]</p>
-</div>
+<footer>
+  <p>[Home!] | [Getting Started] | [Function Index] | [Releases] | [Changelog]</p>
+</footer>
 
 [Home]: Home
 [Getting Started]: Getting-Started
