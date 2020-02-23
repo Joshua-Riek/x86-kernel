@@ -9,11 +9,7 @@
 
 
 <div class="footer">
-  <p>[Home](index) | 
-  [Getting Started](Getting-Started) | 
-  [Function Index](Function-Index) | 
-  [Releases](https://github.com/Joshua-Riek/SuccOS/releases/) | 
-  [Changelog](https://github.com/Joshua-Riek/SuccOS/blob/master/changelog.org)</p>
+  <p>[Home] | [Getting Started] | [Function Index] | [Releases] | [Changelog]</p>
 </div>
 
 [Home]: Home
