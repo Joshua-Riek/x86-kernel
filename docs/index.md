@@ -1,13 +1,3 @@
----
-layout: default
----
-output:
-  pdf_document:
-    includes:
-      after_body: footer.tex
----
-
----
 
 ## Resources
 * [Getting Started](Getting-Started)
