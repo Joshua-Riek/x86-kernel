@@ -177,11 +177,13 @@ videoWriteChar:
     call videoWriteChar                         ; Write it to the screen cx times
 
     jmp .done
-.bs:
-    cmp byte [curX], 0
+
+  .bs:
+    cmp byte [curX], 0                          ; Ensure cursor not zero
     je .done
-    dec byte [curX]
+    dec byte [curX]                             ; Decrese cursor
     jmp .done
+    
   .lf:
     mov byte [curX], 0                          ; Reset the cursor X pos to zero
     jmp .done

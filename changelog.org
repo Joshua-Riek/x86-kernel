@@ -148,6 +148,7 @@
 - Created a wiki page for *disk.asm*.
 - Created a wiki page for *fat.asm*.
 - Created a wiki page for *kernel.asm*.
+- Created a wiki page for *keyboard.asm*.
 - Created a wiki page for *memory.asm*.
 - Created a wiki page for *serial.asm*.
 - Created a wiki page for *string.asm*.
@@ -159,7 +160,21 @@
 - Function *fileSize* updated to set carry if file is a directory.
 - Function *parseStr* updated to properly handle if only one token is present.
 
-* STUFF
-- TODO Potental makefile/ ELF updates?
-- TODO Create correct time stamps for file write/ creation. 
-- TODO Look into serial ports more and make everything look nice.
+* CHANGELOG 1.2.0
+- Function *setupKbdCtrl* to set my own kbd controller interrupt.
+- Function *kbdCtrlRead* to read a byte from the kbd controller.
+- Function *kbdCtrlWrite* to send a byte to the kbd controller.
+- Function *kbdCtrlSendCmd* to send a command to the kbd controller.
+- Function *kbdCtrlSelfTest* to preform a kbd controller self test.
+- Function *kbdCtrlSetLeds* to set the kbd leds.
+- Function *kbdCtrlWaitUntillKey* to wait untill a key is pressed.
+- Function *kbdCtrlCaptureInput* to get input from kbd and fill into buffer.
+- Function *kbdCtrlHandler* to act as a custom handler for the kbd controller.
+- Function *kbdEncSendCmd* to send a command to the kbd encoder.
+- Function *scanToAscii* to translate scan code to ascii and set flags.
+
+* TODO
+- Potental makefile/ ELF updates?
+- Create correct time stamps for file write/ creation. 
+- Look into serial ports more and make everything look nice.
+- Create a system detection program.
