@@ -114,3 +114,12 @@ fileTesting:
     ret
 
 
+    ; system detection
+    ; System type:
+    ; System BIOS:
+    ; Diskette a:
+    ; Diskette b:
+    ; Hard Drive 0:
+    ; Hard Drive 0:
+    ; Video Adapter:
+    ; Video Vendor:

@@ -216,6 +216,10 @@ cliLoop:
     call strCmp
     jc doRedistrib
 
+    mov si, cmdDump
+    call strCmp
+    jc doDump
+    
     jmp doLoad                                  ; Try to load a file
 
 ;---------------------------------------------------

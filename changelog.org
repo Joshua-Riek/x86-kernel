@@ -178,3 +178,4 @@
 - Create correct time stamps for file write/ creation. 
 - Look into serial ports more and make everything look nice.
 - Create a system detection program.
+- Create a hex viewer program
