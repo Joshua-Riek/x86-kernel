@@ -54,10 +54,10 @@ entryPoint:
      
     mov byte [drive], dl                        ; Save the boot drive number
 
-    call setupVideo                             ; Grab the cursor pos from bios
+    call setupVideo                             ; Grab the cursor pos and screen info from bios
 
     call setupInt0x21                           ; Setup my dos emulation
-        
+           
     call setupDisk                              ; Setup the disk manager
     jc .diskError
 
@@ -66,7 +66,7 @@ entryPoint:
     
     call setupKbdCtrl                           ; Setup the keyboard manager
     jc .kbdError
-    
+
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
     call videoWriteStr
     
@@ -78,34 +78,44 @@ entryPoint:
   .hang:
     hlt
     jmp .hang
-    
-  .kbdError:
-    mov si, .kbdErrorMsg                        ; Tell the user that their was a kbd error
-    call videoWriteStr                          ; Write string to standard output
-    jmp .reboot
 
   .memError:
     mov si, .memErrorMsg                        ; Tell the user that their was a mem error
     call videoWriteStr                          ; Write string to standard output
     jmp .reboot
-    
+        
+  .kbdError:
+    mov si, .kbdErrorMsg                        ; Tell the user that their was a kbd error
+    call videoWriteStr                          ; Write string to standard output
+    jmp .reboot
+
   .diskError:
     mov si, .diskErrorMsg                       ; Tell the user that their was a disk error
     call videoWriteStr                          ; Write string to standard output
-    
+    jmp .reboot
+
   .reboot:
     mov si, .errorMsg                           ; Handle any error starting up the system
     call videoWriteStr                          ; Write string to standard output
+
+    call videoUpdateBiosCur                     ; Update the bios cursor before reboot
     
     call kbdCtrlWaitUntillKey                   ; Get a single keypress
+    
+    mov ah, 0x0e                                ; Teletype output
+    mov al, 0x0d                                ; Carriage return
+    int 0x10                                    ; Video interupt
+    mov al, 0x0a                                ; Line feed
+    int 0x10                                    ; Video interupt
+    int 0x10                                    ; Video interupt
 
     xor ax, ax
     int 0x19                                    ; Reboot the system
 
     hlt
 
-  .kbdErrorMsg  db "Error preforming the keyboard self test!", 10, 13, 0
   .memErrorMsg  db "Error while getting the low system memory!", 10, 13, 0
+  .kbdErrorMsg  db "Error preforming the keyboard self test!", 10, 13, 0
   .diskErrorMsg db "Error while loading the bios paramater block!", 10, 13, 0
   .errorMsg     db "The operating system has halted.", 10, 13
                 db "Please press any key to reboot.", 0
@@ -123,11 +133,10 @@ entryPoint:
 %include "src\cmos.asm"
 %include "src\disk.asm"
 %include "src\test.asm"
+%include "src\math.asm"
 %include "src\fat.asm"
 %include "src\cli.asm"
 %include "src\dos.asm"
-;%include "src\hexview.asm"
-%include "src\math.asm"
     
 ;---------------------------------------------------
 ; Main kernel varables below
