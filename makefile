@@ -86,7 +86,8 @@ clobber: clean
 install-win: 
 	cp 1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
-	cp $(BINDIR)/kernel.bin B:/kernel.bin
+#	cp $(BINDIR)/kernel.bin B:/kernel.bin
+	cp $(BINDIR)/*.bin B:/
 	imdisk -D -m B:
 
 # Write the kernel to a disk image

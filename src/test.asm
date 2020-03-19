@@ -30,8 +30,7 @@
     mov si, %%str1
     call changeDir
 %endmacro
-
-
+%ifdef penis
 fileTesting:
     push ax
     push bx
@@ -112,8 +111,7 @@ fileTesting:
     pop bx
     pop ax
     ret
-
-
+%endif
     ; system detection
     ; System type:
     ; System BIOS:
@@ -123,3 +121,108 @@ fileTesting:
     ; Hard Drive 0:
     ; Video Adapter:
     ; Video Vendor:
+ 
+int1Service:
+    ; stack: ret, flags, ax, cx, dx, bx, sp, bp, si, di, ds, es
+
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp
+    push bp
+    push si
+    push di
+    push ds
+    push es
+
+    mov bp, sp
+    mov ax, word [ss:bp+22]
+
+    xor dx, dx
+    mov bx, 16
+    mov ch, 4
+    mov cl, '0'
+    call videoWriteNumPadding32
+
+    mov al, ':'
+    call videoWriteChar
+    
+    mov ax, word [ss:bp+20]
+    call videoWriteNumPadding32
+    
+    mov al, 10
+    call videoWriteChar
+    mov al, 13
+    call videoWriteChar
+
+    
+    ;push ax                                     ; Save registers
+    ;push bx
+    ;push cx
+    ;push dx
+    ;push sp
+    ;push bp
+    ;push si
+    ;push di
+    ;push ds
+    ;push es
+
+    ;pushf
+    mov ax, 0
+    int 0x16
+    ;popf
+     ;   call videoWriteChar
+
+
+    
+    ;pop es
+   ; pop ds
+    ;pop di
+    ; pop si
+    pop es
+    pop ds
+    pop di
+    pop si
+    pop bp
+    pop sp
+    pop bx
+    pop dx
+    pop cx
+    pop ax
+    iret
+    
+
+
+int3Service:
+    ; stack: ret, flags, ax, cx, dx, bx, sp, bp, si, di, ds, es
+
+    push ax
+    push cx
+    push dx
+    push bx
+    push sp
+    push bp
+    push si
+    push di
+    push ds
+    push es
+
+    mov bp, sp
+    or word [ss:bp+24], 0x100
+    ;mov ax, 0
+   ; int 0x16
+    ;call videoWriteChar
+
+    pop es
+    pop ds
+    pop di
+    pop si
+    pop bp
+    pop sp
+    pop bx
+    pop dx
+    pop cx
+    pop ax
+    iret
+    

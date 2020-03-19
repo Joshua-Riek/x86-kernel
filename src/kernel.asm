@@ -56,15 +56,17 @@ entryPoint:
 
     call setupVideo                             ; Grab the cursor pos from bios
 
+    call setupInt0x21                           ; Setup my dos emulation
+        
     call setupDisk                              ; Setup the disk manager
     jc .diskError
 
     call setupMemory                            ; Setup the memory manager
     jc .memError
-
+    
     call setupKbdCtrl                           ; Setup the keyboard manager
     jc .kbdError
-        
+    
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
     call videoWriteStr
     
@@ -95,8 +97,7 @@ entryPoint:
     mov si, .errorMsg                           ; Handle any error starting up the system
     call videoWriteStr                          ; Write string to standard output
     
-    xor ax, ax
-    int 0x16                                    ; Get a single keypress
+    call kbdCtrlWaitUntillKey                   ; Get a single keypress
 
     xor ax, ax
     int 0x19                                    ; Reboot the system
@@ -124,7 +125,9 @@ entryPoint:
 %include "src\test.asm"
 %include "src\fat.asm"
 %include "src\cli.asm"
-;%include "src\dos.asm"
+%include "src\dos.asm"
+;%include "src\hexview.asm"
+%include "src\math.asm"
     
 ;---------------------------------------------------
 ; Main kernel varables below

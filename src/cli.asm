@@ -120,7 +120,7 @@ cliLoop:
 
   .captureInput:
     mov si, cliBuff                             ; Now capture the user input
-    call kbdCtrlCaptureInput
+    call kbdBiosCaptureInput
 
     mov al, 0x0a                                ; Line feed
     call videoWriteChar
@@ -1360,128 +1360,38 @@ doLoad:
 
     
 doDump:
-    push si
-    push ds
-    push es
-
+    
     mov si, bx
-    mov bx, 16
+    mov bx, 10
     call atoi
-
-    push ax
-    
-    mov si, cx
-    mov bx, 16
-    call atoi
-
-    pop bx
-    mov es, bx
-    mov di, ax
-    
     mov si, .buffer
-
+    mov bx, 10
+    call itoa
     
-    mov cx, 0
-  .processBytes:
-    push cx
-    xor dx, dx                                  ; Zero out the remander
-    mov ax, cx                                  ; Set ax with the counter/ index
-    mov bx, 16                                  ; Length of the hexdump
-    div bx                                      ; Divide
-    cmp dx, 0                                   ; Check for remainder
-    jne .displayByte
-    cmp cx, 0                                   ; Check counter for zeroth line
-    je .displayAddr
-
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-
-    mov si, .buffer                             ; Display the ascii buffer
+    mov si, bx
+    mov bx, 10
+    call atoi
+    xchg ax, dx
+    mov bx, 10
+    call itoa
+    mov si, .buffer
     call videoWriteStr
-    
-    mov al, 0x0a                                ; Line feed
+    mov al, '|'
     call videoWriteChar
-    mov al, 0x0d                                ; Newline
-    call videoWriteChar
-
-  .displayAddr:
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    
-    mov ax, es                                  ; Segment address
-    mov bx, 16                                  ; Base 16 (hex format)
-    mov cl, '0'                                 ; Pad with ascii zeros
-    mov ch, 4                                   ; Length of pad 
-    call videoWriteNumPadding
-
-    mov al, ':'                                 ; Colon
-    call videoWriteChar
-    
-    mov ax, di                                  ; Offset address
-    mov bx, 16                                  ; Base 16 (hex format)
-    mov cl, '0'                                 ; Pad with ascii zeros
-    mov ch, 4                                   ; Length of pad 
-    call videoWriteNumPadding
-
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    
-  .displayByte:                                 ; Display the current byte in the data
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    
-    xor ah, ah                                  ; Clear higher half of the number
-    mov al, byte [es:di]                        ; Grab the byte to display
-    mov bx, 16                                  ; Base 16 (hex format)
-    mov cl, '0'                                 ; Pad with ascii zeros
-    mov ch, 2                                   ; Length of pad 
-    call videoWriteNumPadding
-
-    mov bx, dx
-
-    cmp al, 0x20
-    jle .nonPrintable
-    cmp al, 0x7e
-    jg .nonPrintable
-
-  .printable:                                   ; Add the printable char to the buffer
-    mov byte [ds:si+bx], al
-    jmp .nextByte
-    
-  .nonPrintable:                                ; Add a period to the buffer
-    mov byte [ds:si+bx], '.'
-    
-  .nextByte:
-    pop cx
-
-    inc di
-    
-    inc cx
-    cmp cx, (16*5)
-    jne .processBytes
-
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-    mov al, ' '                                 ; Whitespace
-    call videoWriteChar
-
-    mov si, .buffer                             ; Display the ascii buffer
+    mov si, .buffer2
     call videoWriteStr
+    push word [curY]
+    call videoSaveScreen
+    call videoClearScreen
+    ;call hexview
+    call videoRestoreScreen
+    pop word [curY]
+
     
-    mov al, 0x0a                                ; Line feed
-    call videoWriteChar
-    mov al, 0x0d                                ; Newline
-    call videoWriteChar
-    
-    pop es
-    pop ds
-    pop si
     jmp cliLoop
-    .buffer times 18 db 0
+.buffer times 32 db 0
+.buffer2 times 32 db 0
+
     
 ;---------------------------------------------------
 doWarranty:

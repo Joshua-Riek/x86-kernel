@@ -57,7 +57,7 @@
 %define KBD_ENC_CMD_ECHO               0xee
 %define KBD_ENC_CMD_SCAN_CODE_SET      0xf0
 %define KBD_ENC_CMD_ID                 0xf2
-%define KBD_ENC_CMD_AUTODELAY          0xF3
+%define KBD_ENC_CMD_AUTODELAY          0xf3
 %define KBD_ENC_CMD_ENABLE             0xf4
 %define KBD_ENC_CMD_RESETWAIT          0xf5
 %define KBD_ENC_CMD_RESETSCAN          0xf6
@@ -522,6 +522,13 @@ kbdCtrlHandler:
     call scanToAscii                            ; Now, convert to ascii
     mov word [lastKey], ax                      ; Store the last scan and ascii code
 
+    push ax
+    push cx
+    mov cx, ax
+    call kbdBiosStoreKey
+    pop cx
+    pop ax
+    
     jmp .done
     
   .setCtrlState:                                ; Set the ctrl state bit

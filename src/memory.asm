@@ -24,7 +24,7 @@
     loMemUsedBlocks dw 0
     loMemMapSeg     dw 0
     loMemMapOff     dw 0
-    kernelSize      dw 0x6000
+    kernelSize      dw 0x7000
     
 ;---------------------------------------------------
 setupMemory:

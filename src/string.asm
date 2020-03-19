@@ -18,7 +18,7 @@
 ;
 
 ;---------------------------------------------------
-itoa:
+uitoa:
 ;
 ; Converts a 32-bit number and base to a string.
 ;
@@ -118,6 +118,135 @@ itoa:
   .baseDigits db '0123456789abcdef'             ; String of base digits
 
 ;---------------------------------------------------
+itoa:
+;
+; Converts a 32-bit number and base to a string.
+;
+; Expects: AX:DX = 32-bit number
+;          DS:SI = String buffer to fill
+;          BX    = Base of number
+;
+; Returns: DS:SI = Number converted to string
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+
+    mov cx, cs
+    mov es, cx
+
+    mov di, .baseDigits                         ; Pointer to the base digits
+
+    xor cx, cx                                  ; Clear the coutner register (how many nums to loop)
+
+    mov word [es:.hiWord], dx                   ; Save the high word of the number
+    mov word [es:.loWord], ax                   ; Save the low word of the number
+
+    cmp ax, 0                                   ; Number must not be zero
+    je .check 
+    cmp bx, 16                                  ; Number must be less than 16
+    jg .zero
+    cmp dx, 0                                   ; Check for a negative number
+    jl .negitive
+
+  .while:                                       ; Repeat untill number in ax is zero
+    xor dx, dx                                  ; Zero out the remander
+    mov ax, word [es:.hiWord]                   ; Fill ax with the high word of the 32-bit number
+    div bx                                      ; Divide
+    mov word [es:.hiWord], ax                   ; Store the high word 
+    mov ax, word [es:.loWord]                   ; Fill ax with the low word of the 32-bit number
+    div bx                                      ; Divide
+    mov word [es:.loWord], ax                   ; Store the low word
+    inc cx                                      ; Increase the counter register
+    push dx                                     ; Push the number onto the stack
+    cmp ax, 0                                   ; Is ax zero? If not jump back to .while
+    jne .while
+    cmp word [es:.hiWord], 0
+    jne .while
+
+  .loop:
+    pop dx                                      ; Pop numbers off stack in reverse order
+
+    push bx
+    mov bx, dx
+    mov al, byte [es:di+bx]                     ; Use dx as an index into di (baseDigits)
+    mov byte [ds:si], al
+    inc si
+    pop bx
+
+    loop .loop                                  ; Repeat cx times
+
+    mov bl, 0
+    mov byte [ds:si], bl                        ; Zero terminate the string
+    inc si
+
+    pop es                                      ; Restore registers
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
+
+  .check:
+    cmp dx, 0                                   ; I feel like this should not work
+    je .zero
+
+    cmp dx, 0                                   ; Check for a negative number
+    jl .negitive
+    jmp .while
+
+  .negitive:
+    cmp bx, 10                                  ; Ensure base 10 number
+    jne .while
+    
+    push bx                                     ; Save the conversion base
+
+    mov bl, '-'                                 ; Add the negative symbol to the start of the string
+    mov byte [ds:si], bl                        ; Store the indexed item into the output array
+
+    inc si                                      ; Increase the address offset
+    not ax                                      ; Convert negitive by ones complement
+    inc ax                                      ; Add one
+    not dx
+
+    mov word [es:.hiWord], dx                   ; Store the high word 
+    mov word [es:.loWord], ax                   ; Store the low word 
+
+    pop bx                                      ; Restore the conversion base
+    jmp .while                                  ; Convert number to base
+    
+  .zero:    
+    mov al, '0'
+    mov byte [ds:si], al
+    inc si
+
+    mov bl, 0
+    mov byte [ds:si], bl
+    inc si
+
+    pop es                                      ; Restore registers
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    
+    ret
+    
+  .baseDigits db '0123456789abcdef'             ; String of base digits
+  .hiWord dw 0
+  .loWord dw 0
+
+;---------------------------------------------------
 atoi:
 ;
 ; Converts a string to a base int.
@@ -125,66 +254,102 @@ atoi:
 ; Expects: DS:SI = String to convert
 ;          BX    = Base of number
 ;
-; Returns: AX    = Number converted
+; Returns: DX:AX = Number converted
 ;
 ;---------------------------------------------------
     push bx                                     ; Save registers
     push cx
-    push dx
     push si
     push di
     
     call strLen                                 ; Get the length of the string
     mov di, si                                  ; Copy the current string address
-    add si, cx                                  ; Start at the end of the string - 1
-    dec si
+    add di, cx                                  ; The end of the string
 
-    mov cx, 1                                   ; Power
-    xor dx, dx                                  ; Clear remander for multiplaction
-    mov word [cs:.num], 0                       ; Ensure starting total is zero
+    cmp si, di                                  ; Length of string is zero
+    je .done
+    
+    xor ax, ax                                  ; Result in dx:ax
+    xor dx, dx
 
+    cmp byte [ds:si], '-'
+    jne .loop
+    inc si
   .loop:
-    xor ah, ah
-    mov al, byte [ds:si]
-    cmp al, '0'                                 ; Check if the input is a decimal digit (ax >= 48 && ax <= 57)
+    xor ch, ch
+    mov cl, byte [ds:si]
+    
+    cmp cl, '0'                                 ; Check if the input is a decimal digit (ax >= 48 && ax <= 57)
 	jl .hex
-    cmp al, '9'
+    cmp cl, '9'
     jg .hex
     
   .decimal:                                     ; Handle decimal digits
-    sub al, '0'
+    sub cl, '0'
     jmp .multiply
 
   .hex:                                         ; Handle hexadecimal digits
-    sub al, 'A'
-    add al, 10
+    sub cl, 'A'
+    add cl, 10
     
   .multiply:
-    cmp al, 16                                  ; Ensure valid number
+    cmp cl, 16                                  ; Ensure valid number
     jge .done
 
-    mul cx                                      ; Multiply the digit by the power
-    add word [cs:.num], ax                      ; Store the result
-    mov ax, bx                                  ; Base of the number
-    mul cx                                      ; Multiply by the power
-    mov cx, ax                                  ; Store the power into cx for loop
+    push cx
+    push bx
+    push si
+    push di
+
+    mov si, ax                                  ; Low word of result
+    mov di, dx                                  ; High word of result
+    mov cx, bx                                  ; Base of number
     
-    dec si
+    clc
+    xor dx, dx                                  ; Multiply the base by the Low word
+    mov ax, cx                                  ; Base of number
+    mov bx, si                                  ; Low word
+    mul bx
+    push ax
+    push dx
+                                                ; Multiply Low word by the High word
+    mov ax, cx                                  ; Base of number
+    mov bx, di                                  ; High word
+    mul bx
+    pop bx
+    add ax, bx                                  ; Add the partial product
+    adc dx, 0                                   ; Adjust if carry
+
+    pop dx
+    xchg dx, ax
+
+    pop di
+    pop si
+    pop bx
+    pop cx
+    
+    add al, cl
+    
+    inc si
     cmp si, di
-    jge .loop
+    jne .loop
 
   .done:
-    mov ax, word [cs:.num]                      ; Return total 
-    
     pop di                                      ; Restore registers
     pop si
-    pop dx
+
+    cmp byte [ds:si], '-'
+    jne .negate
+    not ax                                      ; Convert negitive by ones complement
+    inc ax                                      ; Add one
+    not dx
+    
+  .negate:
     pop cx
     pop bx
+    
     ret
 
-  .num dw 0
-      
 ;---------------------------------------------------
 convertFilename83:
 ;

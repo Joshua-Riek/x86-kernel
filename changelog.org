@@ -173,6 +173,28 @@
 - Function *kbdEncSendCmd* to send a command to the kbd encoder.
 - Function *scanToAscii* to translate scan code to ascii and set flags.
 
+* CHANGELOG 1.3.0
+- Function *uitoa* to handle unsigned ints.
+- Function *itoa* updated to handle signed ints.
+- Function *atoi* updated to handle signed 32-bit ints.
+
+* CHANGELOG 1.4.0
+- Function *u32x16mul* to test 32-bit by 16-bit unsigned multiplication.
+- Function *s32x16mul* to test 32-bit by 16-bit signed multiplication.
+- Function *u32x16div* to test 32-bit by 16-bit unsigned division.
+- Function *s32x16div* to test 32-bit by 16-bit signed division.
+- Function *u32x32div* to test 32-bit by 32-bit unsigned divison.
+- Function *s32x32div* to test 32-bit by 32-bit signed division.
+- Function *u32x16add* to test 32-bit by 16-bit unsigned addition.
+- Function *s32x16add* to test 32-bit by 16-bit signed addition.
+- Function *u32x32add* to test 32-bit by 32-bit unsigned addition.
+- Function *s32x32add* to test 32-bit by 32-bit signed addition.
+- Function *u32x16sub* to test 32-bit by 16-bit unsigned subtraction.
+- Function *s32x16sub* to test 32-bit by 16-bit signed subtraction.
+- Function *u32x32sub* to test 32-bit by 32-bit unsigned subtraction.
+- Function *s32x32sub* to test 32-bit by 32-bit signed subtraction.
+
+
 * TODO
 - Potental makefile/ ELF updates?
 - Create correct time stamps for file write/ creation. 
