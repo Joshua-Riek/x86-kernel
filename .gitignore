@@ -3,6 +3,8 @@
 bin/*
 obj/*
 src/inc
-src/dos.asm
 floppy.img
 floppy - Copy.img
+720k - Copy.img
+720k.img
+*~

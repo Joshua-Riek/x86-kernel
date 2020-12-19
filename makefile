@@ -84,6 +84,7 @@ clobber: clean
 
 # Write the kernel to a disk image
 install-win: 
+#	cp 720k.img $(DISKIMG)
 	cp 1440k.img $(DISKIMG)
 	imdisk -a -f $(DISKIMG) -m B:
 #	cp $(BINDIR)/kernel.bin B:/kernel.bin

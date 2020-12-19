@@ -194,6 +194,17 @@
 - Function *u32x32sub* to test 32-bit by 32-bit unsigned subtraction.
 - Function *s32x32sub* to test 32-bit by 32-bit signed subtraction.
 
+* CHANGELOG 1.5
+- Funciton *kbdCtrlRead* updated to disable then enable interrupts while accessing hardware.
+- Funciton *kbdCtrlWrite* updated to disable then enable interrupts while accessing hardware.
+- Funciton *kbdCtrlSendCmd* updated to disable then enable interrupts while accessing hardware.
+- Funciton *kbdEncSendCmd* updated to disable then enable interrupts while accessing hardware.
+- Funciton *kbdCtrlHandler* updated to use system control port for compatibility with 8255.
+
+- Temp bufix *memFreeBytes* updated to add 512 bytes to the total bytes to free.
+- Temp bugfix *memAllocBytes* updated to add 512 bytes to the total bytes to allocate.
+
+- Bug seems to occur on 720mb floppy drives and only when the kernel is greater than 22kb in size.
 
 * TODO
 - Potental makefile/ ELF updates?

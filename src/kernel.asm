@@ -37,7 +37,7 @@
 ;---------------------------------------------------
 ; Kernel entry-point
 ;---------------------------------------------------
-
+main:
 global entryPoint
 entryPoint:
     jmp KERNEL_SEG:$+5                          ; Fix the cs:ip registers

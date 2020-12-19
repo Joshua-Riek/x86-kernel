@@ -161,7 +161,7 @@ setupKbdCtrl:
     mov word [es:0x09*4+2], cs                  ; Segment of interupt handler
     sti
 
-    call kbdCtrlSelfTest                        ; Run a keyboard self test, result in carry flag
+    ;call kbdCtrlSelfTest                        ; Run a keyboard self test, result in carry flag
 
     pop es                                      ; Restore registers
     pop ax
@@ -177,6 +177,8 @@ kbdCtrlRead:
 ; Returns: AL    = Byte from read
 ;
 ;--------------------------------------------------- 
+    cli                                         ; Disable interrupts while accessing hardware
+
   .wait:                                        ; Read from the status port and check the
     in al, KBD_CTRL_STATUS_PORT                 ; status of the output buffer, must wait untill
     IO_DELAY                                    ; its ready to read
@@ -186,6 +188,8 @@ kbdCtrlRead:
     in al, KBD_CTRL_DATA_PORT                   ; Now read the byte from the data port
     IO_DELAY
     
+    sti                                         ; Allow for interrupts again
+
     ret
     
 ;---------------------------------------------------
@@ -200,6 +204,7 @@ kbdCtrlWrite:
 ;---------------------------------------------------
     push dx
 
+    cli                                         ; Disable interrupts while accessing hardware
     mov dl, al
     
   .wait:                                        ; Read from the status port and check the
@@ -211,6 +216,8 @@ kbdCtrlWrite:
     mov al, dl
     out KBD_CTRL_DATA_PORT, al                  ; Send the byte to the data port
     IO_DELAY
+
+    sti                                         ; Allow for interrupts again
 
     pop dx
     ret
@@ -226,6 +233,8 @@ kbdCtrlSendCmd:
 ;
 ;---------------------------------------------------
     push ax
+
+    cli                                         ; Disable interrupts while accessing hardware
 
   .wait:                                        ; Read from the status port and check the
     in al, KBD_CTRL_STATUS_PORT                 ; status of the input buffer, must wait untill
@@ -243,8 +252,11 @@ kbdCtrlSendCmd:
     test al, KBD_CTRL_STATUS_IN_BUF
     jnz .accept
 
+    sti                                         ; Allow for interrupts again
+
     pop ax
     ret
+    
     
 ;---------------------------------------------------
 kbdCtrlSelfTest:
@@ -455,12 +467,22 @@ kbdCtrlHandler:
     push ds
     push es
 
+    cli                                         ; Disable interrupts while accessing hardware
+
     mov bx, cs                                  ; Correct the data segment 
     mov ds, bx
 
     in al, KBD_CTRL_DATA_PORT                   ; Now read the byte from the data port
     IO_DELAY
     
+    push ax
+    in al, 0x61                                 ; System control port for compatibility with 8255
+    or al, 0x80                                 ; Set the parity check bit
+    out 0x61, al                                ; send it back
+    and al, 0x7f                                ; Clear the parity check bit
+    out 0x61, al                                ; send that back
+    pop ax
+
     mov ah, al
     and ah, 0x80                                ; Check the scan code to see if its a break code (bit 7 is set)
     jz .scanCode
@@ -565,7 +587,9 @@ kbdCtrlHandler:
     mov al, PIC_MASTER_COMMAND
     out PIC_MASTER_COMMAND, al                  ; Acknowlege the interrupt to the PIC
     IO_DELAY
-    
+   
+    sti                                         ; Allow for interrupts again
+
     pop es                                      ; Restore registers
     pop ds
     pop di
@@ -588,6 +612,8 @@ kbdEncSendCmd:
 ;---------------------------------------------------
     push ax
 
+    cli                                         ; Disable interrupts while accessing hardware
+
   .wait:                                        ; Read from the status port and check the
     in al, KBD_CTRL_STATUS_PORT                 ; status of the input buffer, must wait untill
     IO_DELAY                                    ; its ready to accept a command
@@ -603,6 +629,8 @@ kbdEncSendCmd:
     IO_DELAY                                    ; accepted the command sent
     test al, KBD_CTRL_STATUS_IN_BUF
     jnz .accept
+
+    sti                                         ; Allow for interrupts again
 
     pop ax
     ret

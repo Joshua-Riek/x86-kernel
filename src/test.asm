@@ -1,3 +1,65 @@
+
+;---------------------------------------------------
+;u32x16mul:
+;
+; Preform unsigned 32-bit by 16-bit multiplication
+; using only 16-bit registers.
+;
+; Expects: DX:AX = Multiplicand 
+;          BX    = Multiplier
+;
+; Returns: DX:AX = Product
+;
+    ;---------------------------------------------------
+
+assert:
+    nop
+    jmp assert
+
+%macro SET32 3
+    mov %1, %3 & 0xffff                         ; Low word
+    mov %2, %3 >> 16                            ; High word
+%endmacro
+
+%macro SET16 2
+    mov %1, %2
+%endmacro
+
+%macro EQ32 3
+    cmp %1, %3 & 0xffff                         ; Check for low word
+    jne assert
+    cmp %2, %3 >> 16                            ; Check for high word
+    jne assert
+%endmacro
+    
+foos:
+
+    SET32 ax, dx, 0x12345                                            
+    SET16 bx, 0x1337
+    call u32x16mul
+    EQ32 ax, dx, 0x15dcb2d3
+
+    SET32 ax, dx, 0x12345                                             
+    SET16 bx, -0x1337
+    call u32x16mul
+    EQ32 ax, dx, 0x0d684d2d
+
+    ;SET32 ax, dx, -0xdead                                             
+    SET16 bx, 0x1337
+    call u32x16mul
+    EQ32 ax, dx, 0xef4951d5
+
+    SET32 ax, dx, 0xdead                                             
+    SET16 bx, -0x1337
+    call u32x16mul
+    EQ32 ax, dx, 0xcdf651d5
+
+
+
+    nop
+    nop
+    ret
+
 %macro writeFileMacro 2+
     jmp %%endstr2
   %%str1:
@@ -101,7 +163,6 @@ fileTesting:
     writeFileMacro "14.TXT", "\14.TXT", 13, 10
     writeFileMacro "15.TXT", "\15.TXT", 13, 10
     writeFileMacro "16.TXT", "\16.TXT", 13, 10
-    
     pop es
     pop ds
     pop di
@@ -121,34 +182,160 @@ fileTesting:
     ; Hard Drive 0:
     ; Video Adapter:
     ; Video Vendor:
- 
+     setupDebug:
+     cli
+    mov word [es:0x01*4], int1Service        ; Offset of interupt handler
+    mov word [es:0x01*4+2], cs                  ; Segment of interupt handler
+
+    ;    mov word [es:0x03*1], int3Service        ; Offset of interupt handler
+    ;mov word [es:0x03*1+2], cs                  ; Segment of interupt handler
+
+    mov word [es:0x03*4], int3Service           ; Offset of interupt handler
+    mov word [es:0x03*4+2], cs                  ; Segment of interupt handler
+
+    sti
+ret
+
 int1Service:
     ; stack: ret, flags, ax, cx, dx, bx, sp, bp, si, di, ds, es
-
-    push ax
-    push cx
-    push dx
-    push bx
-    push sp
-    push bp
-    push si
-    push di
-    push ds
-    push es
+    push ax ;18
+    push cx ;16
+    push dx ;14
+    push bx ;12
+    push sp ; 10
+    push bp ;8
+    push si ; 6
+    push di ;4
+    push ds ;2
+    push es ;0
 
     mov bp, sp
-    mov ax, word [ss:bp+22]
 
     xor dx, dx
     mov bx, 16
     mov ch, 4
     mov cl, '0'
+    
+    mov al, 'A'
+    call videoWriteChar
+    mov al, 'X'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+18]
     call videoWriteNumPadding32
 
-    mov al, ':'
+    mov al, ' '
     call videoWriteChar
+    mov al, 'B'
+    call videoWriteChar
+    mov al, 'X'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+12]
+    call videoWriteNumPadding32
+        mov al, ' '
+    call videoWriteChar
+    mov al, 'C'
+    call videoWriteChar
+    mov al, 'X'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+16]
+    call videoWriteNumPadding32
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'D'
+    call videoWriteChar
+    mov al, 'I'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+14]
+    call videoWriteNumPadding32
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'S'
+    call videoWriteChar
+    mov al, 'I'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+6]
+    call videoWriteNumPadding32
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'D'
+    call videoWriteChar
+    mov al, 'I'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+4]
+    call videoWriteNumPadding32
+
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'D'
+    call videoWriteChar
+    mov al, 'S'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+2]
+    call videoWriteNumPadding32
     
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'E'
+    call videoWriteChar
+    mov al, 'S'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+0]
+    call videoWriteNumPadding32
+
+
+    
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'C'
+    call videoWriteChar
+    mov al, 'S'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
+    mov ax, word [ss:bp+22]
+    call videoWriteNumPadding32
+
+    mov al, ' '
+    call videoWriteChar
+    mov al, 'I'
+    call videoWriteChar
+    mov al, 'P'
+    call videoWriteChar
+    mov al, '='
+    call videoWriteChar
+
     mov ax, word [ss:bp+20]
+    sub ax, 0x1000
     call videoWriteNumPadding32
     
     mov al, 10
@@ -156,7 +343,7 @@ int1Service:
     mov al, 13
     call videoWriteChar
 
-    
+
     ;push ax                                     ; Save registers
     ;push bx
     ;push cx
@@ -168,10 +355,19 @@ int1Service:
     ;push ds
     ;push es
 
-    ;pushf
+    ;sti
+    ;call kbdCtrlWaitUntillKey
     mov ax, 0
     int 0x16
-    ;popf
+    
+    cmp al, 0x1b
+    je .esc
+    jmp .cont
+    
+  .esc:
+    and word [ss:bp+24], 0xfeff
+
+  .cont:
      ;   call videoWriteChar
 
 
@@ -180,6 +376,7 @@ int1Service:
    ; pop ds
     ;pop di
     ; pop si
+
     pop es
     pop ds
     pop di
@@ -191,7 +388,6 @@ int1Service:
     pop cx
     pop ax
     iret
-    
 
 
 int3Service:
@@ -224,5 +420,9 @@ int3Service:
     pop dx
     pop cx
     pop ax
+    nop
+    nop
+    nop
+    
     iret
     

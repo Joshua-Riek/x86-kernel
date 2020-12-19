@@ -155,7 +155,7 @@ memBytesToBlocks32:
     or dx, dx                                   ; Test for remander
     jz .roundUp                                 ; Jump if zero flag set
     inc ax                                      ; If remander, add one
-    
+    ;inc ax
   .roundUp:
     xchg ax, bx
     
@@ -423,6 +423,9 @@ memAllocBytes:
     push bx
     push dx
 
+    ; TODO: THIS IS A TEMP BUGFIX FOR 720MB FLOPPY ERRORS
+    add dx, 0x200                               ; Add 512 bytes to the block
+
     call memBytesToBlocks32
     cmp bx, 0
     jz .done
@@ -439,7 +442,7 @@ memAllocBytes:
     call memSet
     pop cx
     
-    call logAllocMem
+    ;call logAllocMem
 
   .done:
     clc                                         ; No error, so clear carry
@@ -559,6 +562,9 @@ memFreeBytes:
     push ax                                     ; Save registers
     push dx
     
+    ; TODO: THIS IS A TEMP BUGFIX FOR 720MB FLOPPY ERRORS
+    add dx, 0x200                               ; Add 512 bytes to the block
+
     call memBytesToBlocks32
     cmp bx, 0
     jz .done
@@ -570,7 +576,7 @@ memFreeBytes:
     pop dx                                      ; Restore registers
     pop ax
 
-    call logFreeMem
+    ;call logFreeMem
   .done:
     clc                                         ; No error, so clear carry
     ret
@@ -651,7 +657,7 @@ allocMemAddress:
     pop bx
     pop ax
 
-    call logAllocMem
+    ;call logAllocMem
     
     clc                                         ; Clear carry on no error
     ret
