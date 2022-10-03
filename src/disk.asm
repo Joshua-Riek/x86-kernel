@@ -1,7 +1,6 @@
 ;  disk.asm
 ;
-;  This file contains BIOS disk functions.  
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -70,11 +69,11 @@ setupDisk:
     push di
     push es
     push ds
-    
+
     xor bx, bx
     mov si, 0x7c00                              ; Set ds:si to the bootstrap code
     mov ds, bx
-    
+
     mov dl, byte [cs:drive]
     cmp dl, 4                                   ; When booting from a hard drive, you must
     jb .continue                                ; call int 13h to fix some bpb entries
@@ -84,7 +83,7 @@ setupDisk:
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
     jc .error
     pop es
-    
+
     and cx, 0x003f                              ; Maximum sector number is the high bits 6-7 of cl
     mov word [ds:si+0x18], cx                   ; And whose low 8 bits are in ch
     xor bx, bx                                  ; Convert the maximum head number to a word
@@ -98,7 +97,7 @@ setupDisk:
     mov bx, cs
     mov di, bpbBuffer                           ; Set es:di to the bpb buffer
     mov es, bx
-    
+
     mov cx, 61
     rep movsb                                   ; Copy 61 bytes from ds:si to es:di to fill the table
 
@@ -108,7 +107,7 @@ setupDisk:
     div word [cs:bytesPerSector]                ; Divided by the number of bytes used per sector
     xor cx, cx
     xchg cx, ax
-        
+
     mov al, byte [cs:fats]                      ; Location of root dir = (fats * fatSectors) + reservedSectors
     mul word [cs:fatSectors]                    ; Multiply by the sectors used
     add ax, word [cs:reservedSectors]           ; Increase ax by the reserved sectors
@@ -138,6 +137,7 @@ setupDisk:
     xor bh, bh
     mul bx
     mov word [cs:bytesPerCluster], ax
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -147,13 +147,13 @@ setupDisk:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .error:
     pop es
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -162,7 +162,7 @@ setupDisk:
     pop cx
     pop bx
     pop ax
-    
+
     stc                                         ; Set carry, error occured
     ret
 
@@ -191,18 +191,18 @@ readSectors:
 
     mov bx, cs                                  ; Ensure corret data segment
     mov ds, bx
-    
+
     mov bx, di                                  ; Set disk buffer offset to bx
-    
+
   .sectorLoop:
     push ax
     push cx
     push dx
-    
+
     push bx                                     ; Save disk buffer offset
-    
+
     ;xor dx, dx                                 ; This allows us to access even more sectors!
-    
+
     div word [sectorsPerTrack]                  ; Divide the lba (value in ax:dx) by sectorsPerTrack
     mov cx, dx                                  ; Save the absolute sector value 
     inc cx
@@ -224,7 +224,7 @@ readSectors:
     pop bx                                      ; Restore disk buffer offset
     
     mov di, 5                                   ; Try five times to read the sector
-    
+
   .attemptRead:
     mov ax, 0x0201                              ; Read Sectors func of int 13h, read one sector
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
@@ -232,12 +232,12 @@ readSectors:
 
     xor ah, ah                                  ; Reset Drive func of int 13h
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
-    
+
     dec di                                      ; Decrease read attempt counter
     jnz .attemptRead                            ; Try to read the sector again
 
     jmp .readError
-    
+
   .readOk:
     pop dx
     pop cx
@@ -254,10 +254,10 @@ readSectors:
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
   .nextSector:
     loop .sectorLoop                            ; Read the next sector for cx times
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -269,7 +269,7 @@ readSectors:
 
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .readError:                                   ; Error while reading a sector
     pop dx
     pop cx
@@ -283,10 +283,10 @@ readSectors:
     pop cx
     pop bx
     pop ax
-        
+
     stc                                         ; Set carry flag on error
     ret
-    
+
 ;---------------------------------------------------
 writeSectors:
 ;
@@ -311,9 +311,9 @@ writeSectors:
 
     mov bx, cs                                  ; Ensure corret data segment
     mov ds, bx
-    
+
     mov bx, di                                  ; Set disk buffer offset to bx
-    
+
   .sectorLoop:
     push ax
     push cx
@@ -343,9 +343,9 @@ writeSectors:
     mov dl, byte [drive]                        ; Set correct drive for int 13h
     mov dh, bh                                  ; Move the absolute head into dh
     pop bx                                      ; Restore disk buffer offset
-    
+
     mov di, 5                                   ; Try five times to write the sector
-    
+
   .attemptWrite:
     mov ax, 0x0301                              ; Write sectors func of int 13h, write one sector
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
@@ -353,12 +353,12 @@ writeSectors:
   
     xor ah, ah                                  ; Reset Drive func of int 13h
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
-    
+
     dec di                                      ; Decrease write attempt counter
     jnz .attemptWrite                           ; Try to write the sector again
 
     jmp .writeError
-    
+
   .writeOk:
     pop dx
     pop cx
@@ -375,7 +375,7 @@ writeSectors:
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
   .nextSector:
     loop .sectorLoop                            ; Write the next sector for cx times
 
@@ -429,10 +429,10 @@ loadCwd:
 
     mov ax, cs                                  ; Ensure correct data segment
     mov ds, ax
-    
+
     call allocCwd                               ; Allocate the current working dir into memory
     jc .memError
-    
+
     call readCwd                                ; Read the current working directory
     jc .readError
 
@@ -447,10 +447,10 @@ loadCwd:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .readError:
     call unloadCwd                              ; Free the dir from memory
 
@@ -502,7 +502,7 @@ unloadCwd:
     pop ax
 
     ret
-    
+
 ;--------------------------------------------------
 readCwd:
 ;
@@ -528,7 +528,7 @@ readCwd:
     mov bx, word [cwdCluster]
     cmp bx, 0                                   ; When cwd cluster is zero, its the root dir
     jne .dir                                    ; This is because you cannot have a cluster below 2
-    
+
   .root:
     xor dx, dx
     mov cx, word [rootDirSize]                  ; Read the size in sectors of the directory
@@ -536,12 +536,12 @@ readCwd:
     call readSectors                            ; Read the sectors 
     jc .readError
     jmp .done
-    
+
   .dir:
     mov ax, bx                                  ; Cwd cluster
     call readClusters                           ; Read the cluster
     jc .readClustError
-    
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -551,10 +551,10 @@ readCwd:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .readClustError:
   .readError:
     pop ds                                      ; Restore registers
@@ -602,7 +602,7 @@ writeCwd:
     call writeSectors                           ; Write sectors the sectors
     jc .writeError
     jmp .done
-    
+
   .cwd:
     mov ax, bx                                  ; Cwd cluster
     mov bx, es
@@ -618,7 +618,7 @@ writeCwd:
     xor ax, ax
     mov ax, word [es:di+dirFat.clusterLo]
 
-  .search:    
+  .search:
     cmp byte [es:di], 0x00                      ; Empty entry Marker
     je .write
 
@@ -634,13 +634,13 @@ writeCwd:
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
     jmp .search
-    
+
   .write:
     mov es, bx                                  ; Set the buffer back to the start of the dir
     mov di, cx
-    
+
     xor ax, ax
     call writeClusters                          ; Now write the new clusters to the disk
 
@@ -655,7 +655,7 @@ writeCwd:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
   
@@ -673,8 +673,6 @@ writeCwd:
     stc                                         ; Set carry, error occured
     ret
 
-  .dot db '.', 0
-    
 ;--------------------------------------------------
 allocCwd:
 ;
@@ -692,24 +690,24 @@ allocCwd:
     push cx
     push dx
     push ds
-    
+
     mov ax, cs
     mov ds, ax
-    
+
     xor dx, dx
     mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
     mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
     xchg ax, dx
-    
+
     call memAllocBytes                          ; Allocate memory
     jc .memError                                ; Out of memory
-    
+
     pop ds                                      ; Restore registers
     pop dx
     pop cx
     pop bx
     pop ax
-      
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -722,7 +720,7 @@ allocCwd:
 
     stc                                         ; Set carry, error occured
     ret
-         
+
 ;--------------------------------------------------
 freeCwd:
 ;
@@ -738,10 +736,10 @@ freeCwd:
     push cx
     push dx
     push ds
-    
+
     mov ax, cs
     mov ds, ax
-    
+
     xor dx, dx
     mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
     mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
@@ -754,9 +752,9 @@ freeCwd:
     pop cx
     pop bx
     pop ax
-      
+
     ret
-    
+
 ;--------------------------------------------------
 loadFat:
 ;
@@ -777,10 +775,10 @@ loadFat:
 
     mov ax, cs                                  ; Ensure correct data segment
     mov ds, ax
-    
+
     call allocFat                               ; Allocate the FAT into memory
     jc .memError
-    
+
     call readFat                                ; Now read the FAT
     jc .readError
 
@@ -795,10 +793,10 @@ loadFat:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .readError:
     call freeFat                                ; Free the FAT from memory
 
@@ -834,7 +832,7 @@ unloadFat:
 
     mov ax, cs                                  ; Ensure correct data segment
     mov ds, ax
-    
+
     mov ax, word [fatSEG]                       ; Get the FAT segment
     mov es, ax
     mov di, word [fatOFF]                       ; Get the FAT offset
@@ -850,7 +848,7 @@ unloadFat:
     pop ax
 
     ret
-    
+
 ;---------------------------------------------------
 readFat:
 ;
@@ -869,10 +867,10 @@ readFat:
     push di
     push es
     push ds
-    
+
     mov dx, cs                                  ; Ensure correct data segment
     mov ds, dx
-    
+
     xor dx, dx
     xor ah, ah                                  ; Size of fat = (fats * fatSectors)
     mov al, byte [fats]                         ; Move number of fats into al
@@ -883,7 +881,7 @@ readFat:
     mov ax, word [reservedSectors]              ; Convert the first fat on the disk
     call readSectors                            ; Read the sectors
     jc .readError
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -895,7 +893,7 @@ readFat:
    
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .readError:
     pop ds                                      ; Restore registers
     pop es
@@ -908,7 +906,7 @@ readFat:
 
     stc                                         ; Set carry, error occured
     ret
-    
+
 ;---------------------------------------------------
 writeFat:
 ;
@@ -924,10 +922,10 @@ writeFat:
     push cx
     push dx
     push ds
-    
+
     mov dx, cs                                  ; Ensure correct data segment
     mov ds, dx
-    
+
     xor dx, dx
     xor ah, ah                                  ; Size of fat = (fats * fatSectors)
     mov al, byte [fats]                         ; Move number of fats into al
@@ -938,16 +936,16 @@ writeFat:
     mov ax, word [reservedSectors]              ; Convert the first fat on the disk
     call writeSectors                           ; Write the sectors
     jc .writeError
-    
+
     pop ds                                      ; Restore registers
     pop dx
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .writeError:
     pop ds                                      ; Restore registers
     pop dx
@@ -975,7 +973,7 @@ allocFat:
     push cx
     push dx
     push ds
-    
+
     mov ax, cs
     mov ds, ax
 
@@ -986,7 +984,7 @@ allocFat:
     xor dx, dx
     mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector   
     xchg ax, dx
-    
+
     call memAllocBytes                          ; Allocate memory
     jc .memError                                ; Out of memory
 
@@ -995,7 +993,7 @@ allocFat:
     pop cx
     pop bx
     pop ax
-      
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1008,9 +1006,9 @@ allocFat:
 
     stc                                         ; Set carry, error occured
     ret
-    
+
 ;--------------------------------------------------
-freeFat:    
+freeFat:
 ;
 ; Allocate the FAT into the memory map.
 ;
@@ -1027,7 +1025,7 @@ freeFat:
     push di
     push es
     push ds
-    
+
     mov ax, cs
     mov ds, ax
 
@@ -1040,7 +1038,7 @@ freeFat:
     xchg ax, dx
 
     call memFreeBytes                           ; Free memory
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1051,7 +1049,7 @@ freeFat:
     pop ax
 
     ret
-    
+
 ;--------------------------------------------------
 searchDir:
 ;
@@ -1073,15 +1071,15 @@ searchDir:
 
   .search:
     mov al, byte [es:di]                        ; Grab the first byte of the entry
-    
+
     cmp al, 0x00                                ; Empty entry Marker
     je .fileNotFound
     cmp al, 0xe5                                ; Free entry marker
     je .nextEntry
-    
+
     mov bx, si
     mov dx, di
-    
+
     cld                                         ; Clear direction flag
     mov cx, 11                                  ; Compare first 11 bytes
     rep cmpsb                                   ; Compare ds:si and es:di cx times
@@ -1094,38 +1092,38 @@ searchDir:
     clc
     add di, 32                                  ; Add 32, this points to the next entry 
     jnc .search
-    
+
   .fixBuffer:
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
     jmp .search
 
   .fileFound:
     mov di, dx
-    
+
     pop si                                      ; Restore registers
     pop dx
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, file found
     ret
-    
+
   .fileNotFound:     
     pop si                                      ; Restore registers
     pop dx
     pop cx
     pop bx
     pop ax
-    
+
     stc                                         ; Set carry, file not found
     ret
-    
+
 ;--------------------------------------------------  
 changeDir:
 ; 
@@ -1150,7 +1148,7 @@ changeDir:
 
     mov di, .tmpName                            ; Output string
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
@@ -1168,9 +1166,9 @@ changeDir:
 
     cmp bl, 0x10                                ; Check to see if its a directory
     jne .notDir
-    
+
     mov word [cwdCluster], ax                   ; If it is a directory, set the cwd custer
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1179,13 +1177,13 @@ changeDir:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
   .fileNotFound:
     call unloadCwd                              ; Free the dir from memory
-    
+
   .notDir:    
   .loadDirError:
     pop ds                                      ; Restore registers
@@ -1201,7 +1199,7 @@ changeDir:
     ret
 
   .tmpName times 12 db 0x00
-    
+
 ;--------------------------------------------------  
 createDir:
 ;
@@ -1237,7 +1235,7 @@ createDir:
     mov dx, 0x0200
     call memAllocBytes
     jc .memoryError
-    
+
     mov byte [di+dirFat.filename],     '.'
     mov word [di+dirFat.filename+1],   0x2020   ; Pad filename and ext with spaces
     mov word [di+dirFat.filename+3],   0x2020
@@ -1259,7 +1257,7 @@ createDir:
 
     add di, 32
     mov cx, word [cwdCluster]
-    
+
     mov word [di+dirFat.filename],     '..'
     mov word [di+dirFat.filename+2],   0x2020   ; Pad filename and ext with spaces
     mov word [di+dirFat.filename+4],   0x2020
@@ -1283,16 +1281,16 @@ createDir:
     call writeClusters                          ; Now write the two dir entrys to the disk
 
     call memFreeBytes
-    
+
     call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
-    
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
-    
+
   .search:
     mov al, byte [es:di]                        ; Grab the first byte of the entry
-    
+
     cmp al, 0x00                                ; Empty entry Marker
     je .freeEntry
     cmp al, 0xe5                                ; Free entry marker
@@ -1301,14 +1299,14 @@ createDir:
     clc
     add di, 32                                  ; Point to the next entry
     jnc .nextEntry
-    
+
   .fixBuffer:
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
   .nextEntry:
     jmp .search
 
@@ -1319,7 +1317,7 @@ createDir:
     mov cx, 11                                  ; Length of filename
     rep movsb                                   ; Copy bytes from ds:si to es:di 
     pop cx
-    
+
     sub di, 11
 
     mov byte [di+dirFat.attributes],   0x10     ; File attribtutes
@@ -1337,10 +1335,10 @@ createDir:
 
     mov es, bx
     mov di, dx
-    
+
     call writeCwd                               ; Finally, write it to the disk
     jc .writeDirError
-    
+
     call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
@@ -1351,7 +1349,7 @@ createDir:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1374,7 +1372,7 @@ createDir:
     ret
 
   .tmpName times 12 db 0x00
-        
+
 ;--------------------------------------------------  
 removeDir:
 ; 
@@ -1399,7 +1397,7 @@ removeDir:
 
     mov di, .tmpName                            ; Output string
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
@@ -1408,7 +1406,7 @@ removeDir:
 
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
-    
+
     mov si, .tmpName                            ; Search for the file
     call searchDir
     jc .fileNotFound
@@ -1420,16 +1418,16 @@ removeDir:
     jne .notDir
 
     mov byte [es:di], 0xe5                      ; Mark file entry as deleted
-    
+
     mov es, bx
     mov di, dx
     call writeCwd
-    
+
     call unloadCwd                              ; Free the dir from memory
 
     mov ax, cx
     call removeClusters
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1460,7 +1458,7 @@ removeDir:
     ret
 
   .tmpName times 12 db 0x00
-    
+
 ;--------------------------------------------------  
 fileSize:
 ; 
@@ -1484,35 +1482,35 @@ fileSize:
 
     mov di, .tmpName                            ; Output string
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
     call loadCwd                                ; Allocate and read the root dir
     jc .error
-        
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
-    
+
     mov si, .tmpName                            ; Search for the file
     call searchDir
     jc .fileNotFound
 
     cmp word [di+dirFat.attributes], 0x10       ; Check to see if its a directory
     je .fileNotFound
-    
+
     mov dx, word [di+dirFat.filesize]           ; Get the size of the file
     mov ax, word [di+dirFat.filesize+2]
-    
+
     call unloadCwd                              ; Free the dir from memory
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
     pop si
     pop cx
     pop bx
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1522,19 +1520,19 @@ fileSize:
   .error:
     xor ax, ax
     xor dx, dx
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
     pop si
     pop cx
     pop bx
-    
+
     stc                                         ; Set carry, error occured
     ret
 
  .tmpName times 12 db 0x00
-    
+
 ;--------------------------------------------------  
 fileExists:
 ; 
@@ -1560,7 +1558,7 @@ fileExists:
 
     mov di, .tmpName                            ; Output string
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
@@ -1581,7 +1579,7 @@ fileExists:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1602,7 +1600,7 @@ fileExists:
     ret
 
   .tmpName times 12 db 0x00
-    
+
 ;--------------------------------------------------  
 createFile:
 ;
@@ -1630,13 +1628,13 @@ createFile:
 
     mov di, .tmpName                            ; Filename
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
-    
+
     call loadCwd                                ; Allocate and read the root dir
     jc .error
-    
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
 
@@ -1653,14 +1651,14 @@ createFile:
     clc
     add di, 32                                  ; Point to the next entry
     jnc .nextEntry
-    
+
   .fixBuffer:
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
   .nextEntry:
     loop .search
     jmp .noFileEntrys
@@ -1688,10 +1686,10 @@ createFile:
 
     mov es, bx
     mov di, dx
-    
+
     call writeCwd                               ; Finally, write it to the disk
     jc .writeDirError
-    
+
     call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
@@ -1702,7 +1700,7 @@ createFile:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1745,7 +1743,7 @@ renameFile:
     push di
     push es
     push ds
-    
+
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
@@ -1759,17 +1757,17 @@ renameFile:
 
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
-    
+
     call loadCwd                                ; Allocate and read the dir
     jc .error
-    
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
 
     mov si, .tmpName1                           ; Search for the file to rename
     call searchDir
     jc .fileNotFound
-    
+
     cld                                         ; Clear direction flag
     mov si, .tmpName2                           ; Get the new filename
     mov cx, 11                                  ; Lenght of filename
@@ -1780,7 +1778,7 @@ renameFile:
   
     call writeCwd                               ; Finally, write it to the disk
     jc .writeDirError
-    
+
     call unloadCwd                              ; Free the dir from memory
 
     pop ds                                      ; Restore registers
@@ -1791,11 +1789,11 @@ renameFile:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
-    
-  .fileNotFound:    
+
+  .fileNotFound:
   .writeDirError:
     call unloadCwd                              ; Free the dir from memory
 
@@ -1811,7 +1809,7 @@ renameFile:
 
     stc                                         ; Set carry, error occured
     ret
-    
+
   .tmpName1 times 12 db 0x00
   .tmpName2 times 12 db 0x00
 
@@ -1834,19 +1832,19 @@ deleteFile:
     push di
     push es
     push ds
-    
+
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
     mov di, .tmpName                            ; Filename
     call convertFilename83                      ; Convert the filename into a fat formatted filename (8.3 format)
-    
+
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
-    
+
     call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
-    
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
 
@@ -1860,7 +1858,7 @@ deleteFile:
 
     mov es, bx
     mov di, dx
-    
+
     call writeCwd                               ; Finally, write it to the disk
     jc .writeError1
 
@@ -1875,9 +1873,9 @@ deleteFile:
     mov ax, cx
     call removeClusters
     jc .writeError2
-    
-    ;call unloadFat                              ; Free the FAT from memory
-    
+
+    ;call unloadFat                             ; Free the FAT from memory
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -1887,18 +1885,18 @@ deleteFile:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
   .writeError2:
     call unloadFat                              ; Free the Fat from memory
     jmp .loadFatError
-    
+
   .fileNotFound:
   .writeError1:
     call unloadCwd                              ; Free the dir from memory
-    
+
   .loadDirError:
   .loadFatError:
     pop ds                                      ; Restore registers
@@ -1910,7 +1908,7 @@ deleteFile:
     pop bx
     pop ax
     stc                                         ; Set carry, error occured
-    
+
     ret
 
   .tmpName times 12 db 0x00
@@ -1936,7 +1934,7 @@ readFile:
 
     push es
     push di
-    
+
     mov dx, cs
     mov es, dx                                  ; Set correct data segment for local var
 
@@ -1948,10 +1946,10 @@ readFile:
 
     pop word [.loadOFF]
     pop word [.loadSEG]
-    
+
     call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
-    
+
     mov bx, es                                  ; Save the current dir offset
     mov dx, di
 
@@ -1971,7 +1969,7 @@ readFile:
     mov di, word [.loadSEG]
     mov es, di
     mov di, word [.loadOFF]
-    
+
     call readClusters
     jc .readError
 
@@ -2031,7 +2029,7 @@ writeFile:
 
     push es
     push di
-    
+
     mov cx, cs
     mov es, cx                                  ; Set correct data segment for local var
 
@@ -2045,15 +2043,16 @@ writeFile:
     ;pop word [.loadSEG]
     mov word [.loFilesize], ax                  ; Save the lo word of the filesize
     mov word [.hiFilesize], dx                  ; Save the hi word of the filesize
-    
+
     ;mov si, .tmpName
-    ;call fileExists                             ; Do not overwrite a file if it exists!
+    ;call fileExists                            ; Do not overwrite a file if it exists!
     ;jnc .fileExists
 
     mov si, .tmpName 
     call createFile                             ; Create the file to write
     ;jc .createFileError
-.fileExists:
+
+  .fileExists:
     pop di
     pop es
     mov ax, word [.loFilesize]
@@ -2080,13 +2079,13 @@ writeFile:
     mov word [di+dirFat.filesize], ax
     mov word [di+dirFat.filesize+2], dx
     pop dx
-    
+
     mov es, bx
     mov di, dx
-    
+
     call writeCwd                               ; Finally, write it to the disk
     jc .writeDirError
-    
+
     call unloadCwd                              ; Free the dir from memory
 
   .fileZero:   
@@ -2110,16 +2109,16 @@ writeFile:
     pop cx                                      ; But, error on writing clusters to disk
     pop ax
     jmp .error
-    
+
   .writeDirError:
     call unloadCwd                              ; Free the dir from memory
-    
-.fileExistsError:
-.createFileError:
-.loadFatError:
-.loadDirError: 
 
-.error:
+  .fileExistsError:
+  .createFileError:
+  .loadFatError:
+  .loadDirError: 
+
+  .error:
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -2132,8 +2131,7 @@ writeFile:
     stc                                         ; Set carry, error occured
     ret
 
-
-    .loFilesize dw 0
-    .hiFilesize dw 0
-    .tmpName times 12 db 0x00
+  .loFilesize dw 0
+  .hiFilesize dw 0
+  .tmpName times 12 db 0x00
 

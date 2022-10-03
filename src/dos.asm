@@ -1,7 +1,6 @@
 ;  dos.asm
 ;
-;  Dos emulation of int 0x21
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -16,14 +15,14 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-    
+
 setupInt0x21:
     push ax                                     ; Save registers
     push es
 
     xor ax, ax                                  ; Clear ax
     mov es, ax                                  ; Set extra segment to zero
-    
+
     cli
     mov word [es:0x21*4], int0x21               ; Offset of interupt handler
     mov word [es:0x21*4+2], cs                  ; Segment of interupt handler
@@ -33,7 +32,7 @@ setupInt0x21:
     pop ax
 
     ret
-    
+
 int0x21:
     cmp ah, 0x01                                ; Read a char from standard input, with echo
     je ah_01
@@ -189,7 +188,7 @@ ah_01:
 ;---------------------------------------------------
     push dx                                     ; Save register
     mov dh, ah
-    
+
     mov ah, 0x07                                ; Wait for keyboard input
     int 0x21                                    ; Call to DOS services
 
@@ -200,7 +199,7 @@ ah_01:
     mov ah, dh
     pop dx                                      ; Restore register
     iret
-    
+
 ;---------------------------------------------------
 ah_02:
 ;
@@ -214,9 +213,9 @@ ah_02:
 ;---------------------------------------------------    
     mov al, dl                                  ; Write the char to the standard output
     call videoWriteChar
-    
+
     iret
-    
+
 ;---------------------------------------------------
 ah_03:
 ;
@@ -230,7 +229,7 @@ ah_03:
 ;---------------------------------------------------
     push dx                                     ; Save register
     mov dh, ah
-    
+
     call readSerial                             ; Read from the serial port
 
     mov ah, dh
@@ -249,9 +248,9 @@ ah_04:
 ;
 ;---------------------------------------------------
     push ax                                     ; Save register
-    
+
     mov al, dl
-    call writeSerial                             ; Write to the serial port
+    call writeSerial                            ; Write to the serial port
 
     pop ax                                      ; Restore register
     iret
@@ -276,15 +275,15 @@ ah_06:
 
     push dx                                     ; Save register
     mov dh, ah
-    
+
     call kbdBiosGetChar                          ; Check the bios keyboard buffer and return in ax
 
     mov ah, dh
     pop dx                                      ; Restore register
-    
+
     or al, al                                   ; Set the zero flag :)
     iret
-    
+
 ;---------------------------------------------------
 ah_07:
 ;
@@ -298,7 +297,7 @@ ah_07:
 ;---------------------------------------------------
     push dx                                     ; Save register
     mov dh, ah
-    
+
   .wait:
     mov ah, 0x06                                ; Direct console input or output
     mov dl, 0xff                                ; Request input
@@ -325,9 +324,9 @@ ah_09:
     push ax                                     ; Save registers
     push dx
     push si
-    
+
     mov si, dx                                  ; Move the string from ds:dx, to ds:si
-    
+
   .loop:
     mov dl, byte [ds:si]                        ; Load byte from si to al
     inc si                                      ; Increase offset into string
@@ -381,7 +380,7 @@ ah_0a:
     mov bl, byte [ds:si+1]                      ; Grab the number of characters read
     cmp bl, byte [ds:si+0]                      ; Is the cursor X pos is greater than the chars read?
     jge .loop                                   ; This forces input to loop untill enter or back space
-        
+
     mov dl, al                                  ; Move the character into dl
     mov ah, 0x02                                ; Write a char to standard output
     int 0x21                                    ; Call to DOS services
@@ -405,7 +404,7 @@ ah_0a:
     int 0x21                                    ; Call to DOS services
     mov dl, 0x08                                ; Write a back space (move cursor X pos back by one)
     int 0x21                                    ; Call to DOS services
-    
+
     call videoUpdateCur                         ; Now update cursor pos
 
     jmp .loop                                   ; Go back to the input loop
@@ -415,7 +414,7 @@ ah_0a:
     pop dx
     pop bx
     pop ax
-    
+
     iret
  
 ;---------------------------------------------------
@@ -432,7 +431,7 @@ ah_0b:
 ;---------------------------------------------------
     push dx                                     ; Save register
     mov dh, ah
-    
+
     call kbdBiosCheckBuffer                     ; Check the bios kbd buffer for a key
 
     or al, al                                   ; See if al is equal to zero
@@ -444,7 +443,7 @@ ah_0b:
     mov ah, dh
     pop dx                                      ; Restore register
     iret
-    
+
 ;--------------------------------------------------
 ah_0c:
 ;
@@ -471,5 +470,5 @@ ah_0c:
     je ah_07
     cmp al, 0x0a
     je ah_0a
-    
+
     iret

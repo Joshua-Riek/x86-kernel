@@ -15,7 +15,7 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-    
+
 ;---------------------------------------------------
 ; Cli varables
 ;---------------------------------------------------
@@ -90,10 +90,10 @@ cliLoop:
     mov cx, cs
     mov ds, cx
     mov es, cx
-    
+
     mov si, cliBuff
     mov cx, 96
-    
+
   .zeroLoop:
     mov byte [ds:si], 0
     inc si
@@ -103,11 +103,11 @@ cliLoop:
     call videoWriteChar
     mov al, 0x0d                                ; Newline
     call videoWriteChar
-    
+
   .displayPrompt:
     mov al, byte [drive]
     call driveToAscii                           ; Current drive letter to ascii
-    
+
     call videoWriteChar
     mov al, 0x3a                                ; Ascii ':'
     call videoWriteChar
@@ -120,7 +120,7 @@ cliLoop:
 
   .captureInput:
     mov si, cliBuff                             ; Now capture the user input
-    call kbdBiosCaptureInput
+    call kbdCtrlCaptureInput                    ; Get a single keypress
 
     mov al, 0x0a                                ; Line feed
     call videoWriteChar
@@ -147,11 +147,11 @@ cliLoop:
     mov si, cmdRename                           ; Rename
     call strCmp
     jc doRename
-    
+
     mov si, cmdRen
     call strCmp
     jc doRename
-    
+
     mov si, cmdDel                               ; Del
     call strCmp
     jc doDel
@@ -159,7 +159,7 @@ cliLoop:
     mov si, cmdErase
     call strCmp
     jc doDel
-    
+
     mov si, cmdType                             ; Type
     call strCmp
     jc doType
@@ -179,7 +179,7 @@ cliLoop:
     mov si, cmdDate                             ; Date
     call strCmp
     jc doDate
-    
+
     mov si, cmdHelp                             ; Help
     call strCmp
     jc doHelp
@@ -191,7 +191,7 @@ cliLoop:
     mov si, cmdChdir
     call strCmp
     jc doCd
-    
+
     mov si, cmdMd                               ; Md
     call strCmp
     jc doMd
@@ -211,7 +211,7 @@ cliLoop:
     mov si, cmdWarranty                         ; Warranty
     call strCmp
     jc doWarranty
-    
+
     mov si, cmdRedistrib                        ; Redistrib
     call strCmp
     jc doRedistrib
@@ -219,7 +219,7 @@ cliLoop:
     mov si, cmdDump
     call strCmp
     jc doDump
-    
+
     jmp doLoad                                  ; Try to load a file
 
 ;---------------------------------------------------
@@ -240,25 +240,25 @@ doDir:
     push di
     push es
     push ds
-    
-    call loadCwd                                 ; Allocate and load the dir into memory
+
+    call loadCwd                                ; Allocate and load the dir into memory
     jc .loadDirError
 
     push es
     push di
     push bx
-    
+
     xor bx, bx
     xor cx, cx
     xor dx, dx
-    
+
     push bx
     push dx
     push cx
 
   .searchDir:
     mov al, byte [es:di]                        ; Grab the first byte of the first file
-    
+
     cmp al, 0x00                                ; Skip over an empty entry
     je .nextFile
     cmp al, 0xe5                                ; Skip over the free entry marker
@@ -267,35 +267,35 @@ doDir:
     pop cx
     pop dx
     pop bx
-    
+
     inc cx                                      ; Increase counter for files in directory
-    
+
     clc
     mov ax, word [es:di+dirFat.filesize]        ; Grab the current file's filesize
     add bx, ax                                  ; Add to the total filesize of the dir
     jnc .noCarry
     inc dx                                      ; Increase higher half of the 32-bit filesize
-    
+
   .noCarry:
     add dx, word [es:di+dirFat.filesize+2]
-    
+
     push bx
     push dx
     push cx
   
     mov cx, 8                                   ; Length of the file name  
-    
+
   .printName:
     mov al, byte [es:di]                        ; Grab the first byte of the file name
     call videoWriteChar
     inc di                                      ; Increase the offset to the next character
     loop .printName                             ; Repeat untill name is written
-    
+
     mov al, ' '                                 ; Write a new line onto the screen
     call videoWriteChar
 
     mov cx, 3                                   ; Length of the extension
-    
+
   .printExt:
     mov al, byte [es:di]                        ; Grab the first byte of the ext
     call videoWriteChar
@@ -309,7 +309,7 @@ doDir:
     mov al, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
     cmp al, 0x10                                ; Check to see if its a directory
     jne .fileEntry
-    
+
     mov al, ' '
     call videoWriteChar
     mov al, ' '
@@ -335,7 +335,7 @@ doDir:
     mov al, ' '
     call videoWriteChar
     jmp .printDate
-    
+
   .fileEntry:
     mov ax, word [es:di+dirFat.filesize]        ; Lo word of filesize
     mov dx, word [es:di+dirFat.filesize+2]      ; Hi word of filesize
@@ -369,12 +369,12 @@ doDir:
 
     pop ax
     push ax
-    
+
     and ax, 0000000000011111b                   ; Mask bits for the day
     mov ch, 2                                   ; Pad length
     mov cl, '0'                                 ; Pad with spaces
     call videoWriteNumPadding
-     
+
     mov al, '-'                                 ; Split with a slash
     call videoWriteChar
     mov al, ' '
@@ -400,19 +400,19 @@ doDir:
     mov cl, '0'                                 ; Pad with spaces
     call videoWriteNumPadding
     jmp .printTime
-    
+
   .1980s:
     add ax, 80                                  ; Add 80 for the 1980s
     call videoWriteNum
-    
+
   .printTime:
     mov al, ' '
     call videoWriteChar
     mov al, ' '
     call videoWriteChar
-    
+
     mov ax, word [es:di+dirFat.modifiedTime]    ; Grab the time of the file
-    push ax      
+    push ax
 
     and ax, 1111100000000000b                   ; Mask bits for the month
     shr ax, 1                                   ; Right shift 11 places
@@ -433,29 +433,29 @@ doDir:
     cmp ax, 0                                   ; Must fix value if zero
     jne .fixa
     add ax, 12                                  ; Fix value so it's 12:00a and not 0:00a
-    
+
   .fixa:
     mov dx, 'a'                                 ; Put the 'a' for am into bx
     jmp .hour
-    
+
   .pm:
     sub ax, 12                                  ; Correct the value for pm
     mov dx, 'p'                                 ; Put the 'p' for pm into bx
-    
+
   .hour:
     push dx
 
     mov ch, 2                                   ; Pad length
     mov cl, ' '                                 ; Pad with spaces
     call videoWriteNumPadding
-     
+
     mov al, ':'                                 ; Split with a slash
     call videoWriteChar
-    
+
     pop dx
     pop ax
     push dx
-    
+
     and ax, 0000011111100000b                   ; Mask bits for the month
     shr ax, 1                                   ; Right shift 5 places
     shr ax, 1
@@ -466,15 +466,15 @@ doDir:
     mov ch, 2                                   ; Pad length
     mov cl, '0'                                 ; Pad with spaces
     call videoWriteNumPadding
-     
+
     pop ax
     call videoWriteChar
-    
+
     mov al, 0x0a
     call videoWriteChar                         ; Line feed
     mov al, 0x0d
     call videoWriteChar                         ; Newline
-    
+
   .nextFile:
     add di, 32
     mov byte al, [es:di]                        ; Grab the first byte of the next file
@@ -494,7 +494,7 @@ doDir:
     call videoWriteNum
     mov si, files                               ; Write the 'file(s)' string
     call videoWriteStr
-    
+
     mov al, 0x09                                ; Write a tab
     call videoWriteChar  
     mov al, 0x09                                ; Write a tab
@@ -509,7 +509,7 @@ doDir:
 
     mov si, bytes                               ; Write the 'bytes' string
     call videoWriteStr
-    
+
     mov al, 0x0a
     call videoWriteChar                         ; Line feed
     mov al, 0x0d
@@ -518,9 +518,9 @@ doDir:
     pop bx
     pop dx
     pop ax
-    
+
     call unloadCwd
-    
+
     pop si
     pop ds                                      ; Restore registers
     pop es
@@ -532,11 +532,11 @@ doDir:
     pop ax
 
     jmp cliLoop
-    
+
   .loadDirError:
     mov si, readSectorErr
     call videoWriteStr
-    
+
     pop si
     pop ds                                      ; Restore registers
     pop es
@@ -562,7 +562,7 @@ doRename:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     or cx, cx                                   ; Ensure that the user inputted a filename
     jz paramError
 
@@ -572,11 +572,11 @@ doRename:
     mov si, bx
     call fileExists                             ; Check to see if the filename exists
     jc .fileNotFound
-    
+
     mov si, cx
     call fileExists                             ; Check to see if the filename allready exists
     jnc .fileAllreadyExists
-    
+
     mov si, bx                                  ; File to rename
     mov di, cx                                  ; New filename
     call renameFile                             ; Now call the rename file function
@@ -584,19 +584,19 @@ doRename:
 
     pop di
     pop si
-    
+
     jmp cliLoop
-    
+
   .fileNotFound:
     mov si, fileNotFoundErr
     call videoWriteStr
     jmp .error
-    
+
   .fileAllreadyExists:
     mov si, fileNotFoundOrErr
     call videoWriteStr
     jmp .error
-    
+
   .renameFailure:
     mov si, writeSectorErr
     call videoWriteStr
@@ -604,7 +604,7 @@ doRename:
   .error:
     pop di
     pop si
-    
+
     jmp cliLoop
 
 ;---------------------------------------------------
@@ -632,7 +632,7 @@ doDel:
   .deleteFailure:    
     mov si, fileNotFoundOrErr                   ; Write out an error message
     call videoWriteStr
-    
+
     pop si
     jmp cliLoop
 
@@ -648,7 +648,7 @@ doType:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -661,17 +661,17 @@ doType:
     mov si, bx                                  ; Start by getting the filesize,
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
-    
+
     call memAllocBytes
     jc .memError
-    
+
     call readFile                               ; Now we read the file into memory
     jc .readFailure                             ; Size goes into ax:dx
 
     call memFreeBytes                           ; Free up the memory
 
     xchg ax, dx
-    
+
     cmp ax, 0
     jne .start                                  ; If ax:dx are is empty, we are done
     cmp dx, 0
@@ -679,7 +679,7 @@ doType:
 
   .start:
     mov cx, ax
-    
+
   .readBytes:
     mov al, byte [es:di]                        ; Grab the next byte from the file
     call videoWriteChar
@@ -694,9 +694,9 @@ doType:
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
-    
+
   .nextByte:
-    dec cx
+dec cx
     
     cmp cx, 0                                   ; Decrease counter and see if we are at the end
     jne .readBytes
@@ -706,13 +706,13 @@ doType:
     sub dx, 1
     mov cx, 0xffff
     jmp .nextByte
-    
+
   .done:
     mov al, 0x0a
     call videoWriteChar                         ; Line feed
     mov al, 0x0d
     call videoWriteChar                         ; Newline
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -723,22 +723,22 @@ doType:
     pop ax
 
     jmp cliLoop
-    
+
   .readFailure:  
     call memFreeBytes                           ; Free up the memory used on error
     mov si, readSectorErr
     call videoWriteStr
     jmp .error
-    
+
   .fileNotFound:
     mov si, fileNotFoundErr
     call videoWriteStr
     jmp .error
-    
+
   .memError:
     mov si, memoryErr
     call videoWriteStr
-    
+
   .error:
     pop ds                                      ; Restore registers
     pop es
@@ -767,7 +767,7 @@ doCopy:
 
     or cx, cx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -780,23 +780,23 @@ doCopy:
     mov si, cx
     call fileExists                             ; See if the file to create allready exists
     jnc .fileAllreadyExists
-    
+
     mov si, bx                                  ; Start by getting the filesize,
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
 
     call memAllocBytes                          ; Allocate space for the file 
     jc .memError
-    
+
     call readFile                               ; Now we read the file into memory
     jc .readFailure                             ; Size goes into ax:dx
 
     mov si, cx
     call writeFile                              ; Finally write data into a new file
     jc .writeFailure
-    
+
     call memFreeBytes                           ; Free up the memory
-       
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -807,7 +807,7 @@ doCopy:
     pop ax
 
     jmp cliLoop
-    
+
   .writeFailure:
     call memFreeBytes                           ; Free up the memory used on error
     mov si, writeSectorErr
@@ -819,21 +819,21 @@ doCopy:
     mov si, readSectorErr
     call videoWriteStr
     jmp .error
-    
+
   .fileAllreadyExists: 
     mov si, fileNotFoundOrErr
     call videoWriteStr
     jmp .error
-    
+
   .fileNotFound:
     mov si, fileNotFoundErr
     call videoWriteStr
     jmp .error
-    
+
   .memError:
     mov si, memoryErr
     call videoWriteStr
-    
+
   .error:
     pop ds                                      ; Restore registers
     pop es
@@ -872,18 +872,18 @@ doTime:
 ;---------------------------------------------------
     mov si, currentTime
     call videoWriteStr
-    
+
     mov ah, 0x02                                ; Read RTC time
     int 0x1a                                    ; System and RTC BIOS services
 
     mov al, ch                                  ; Hours in BCD
     call bcd                                    ; Convert BCD
     mov ch, al
-    
+
     mov al, cl                                  ; Minutes in BCD
     call bcd                                    ; Convert BCD
     mov cl, al
-    
+
     mov al, dh                                  ; Seconds in BCD
     call bcd                                    ; Convert BCD
     mov dh, al
@@ -895,18 +895,18 @@ doTime:
 
     mov al, ':'
     call videoWriteChar
-    
+
     mov al, cl                                  ; Minutes
     call videoWriteNum                          ; Write as a number
 
     mov al, ':'
     call videoWriteChar
-        
+
     mov al, dh                                  ; Seconds
     call videoWriteNum                          ; Write as a number
-    
+
     jmp cliLoop
-    
+
 ;---------------------------------------------------   
 doDate:
 ;
@@ -926,11 +926,11 @@ doDate:
     mov al, ch                                  ; Century in BCD
     call bcd                                    ; Convert BCD
     mov ch, al
-    
+
     mov al, cl                                  ; Year in BCD
     call bcd                                    ; Convert BCD
     mov cl, al
-    
+
     mov al, dh                                  ; Month in BCD
     call bcd                                    ; Convert BCD
     mov dh, al
@@ -963,19 +963,18 @@ doDate:
 
     jmp cliLoop
 
-    
+
 paramError:
     push si                                     ; Save registers
-    
+
     mov si, requiredParamErr                    ; Write out an error message
     call videoWriteStr
-    
+
     pop si                                      ; Restore registers
-    
+
     jmp cliLoop
 
 
-    
 ;---------------------------------------------------
 doHelp:
 ;
@@ -1047,10 +1046,10 @@ doHelp:
     call videoWriteStr                          ; Print the command name
     mov si, cmdRdDesc
     call videoWriteStr                          ; Print the command description
-    
+
     pop si
     jmp cliLoop
-    
+
 ;---------------------------------------------------
 doCd:
 ;
@@ -1063,7 +1062,7 @@ doCd:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -1076,7 +1075,7 @@ doCd:
     mov si, bx
     call changeDir                              ; Attempt to change current dir
     jc .changeDirError
-    
+
     mov ax, word [ds:bx]
     cmp ax, '..'
     jne .1dot
@@ -1089,7 +1088,7 @@ doCd:
     mov al, 0                                   ; Then fill it with a zero /null byte
     mov byte [ds:si], al
     dec si
-    
+
   .search1:
     mov al, byte [ds:si]                        ; Grab the next byte from the current path string
     cmp al, 0x5c                                ; Check for a slash '\'
@@ -1099,7 +1098,7 @@ doCd:
     dec si
     loop .search1
     jmp .done
-    
+
   .1dot:
     cmp al, '.'
     je .done
@@ -1150,7 +1149,7 @@ doCd:
     pop ax
 
     jmp cliLoop
-    
+
 ;---------------------------------------------------
 doMd:
 ;
@@ -1163,7 +1162,7 @@ doMd:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -1176,7 +1175,7 @@ doMd:
     mov si, bx
     call createDir                              ; Attempt to create a new dir
     jc .createDirError
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1202,7 +1201,7 @@ doMd:
     pop ax
 
     jmp cliLoop
-    
+
 ;---------------------------------------------------
 doRd:
 ;
@@ -1215,7 +1214,7 @@ doRd:
 ;---------------------------------------------------
     or bx, bx                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -1228,7 +1227,7 @@ doRd:
     mov si, bx
     call removeDir                              ; Attempt to remove a dir
     jc .removeDirError
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1268,7 +1267,7 @@ doLoad:
 ;---------------------------------------------------
     or ax, ax                                   ; Ensure that the user inputted a filename
     jz paramError
-    
+
     push ax                                     ; Save registers
     push bx
     push cx
@@ -1281,10 +1280,10 @@ doLoad:
     mov si, di                                  ; Start by getting the filesize,
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
-    
+
     call memAllocBytes
     jc .memError
-    
+
     call readFile                               ; Now we read the file into memory
     jc .readFailure                             ; Size goes into ax:dx
 
@@ -1292,7 +1291,7 @@ doLoad:
     push ds
     push ax
     push dx
-    
+
     mov dx, es
     mov cx, di                                  ; Here i dont want to work with offsets, 
     shr cx, 1                                   ; so shift it out right 4 times then
@@ -1308,10 +1307,10 @@ doLoad:
     pop ax
     add ax, 8                                   ; We can add 8 to the IP so we return below retf
     push ax
-    
+
     push dx                                     ; The new Code Segment
     push cx                                     ; The new Instruction Pointer
-    
+
     retf                                        ; Far jump to the loaded program!
 
     pop dx
@@ -1319,7 +1318,7 @@ doLoad:
     pop ds
     pop es
     call memFreeBytes                           ; Free up the memory
-    
+
     pop ds                                      ; Restore registers
     pop es
     pop di
@@ -1330,22 +1329,22 @@ doLoad:
     pop ax
 
     jmp cliLoop
-    
+
   .readFailure:  
     call memFreeBytes                           ; Free up the memory used on error
     mov si, readSectorErr
     call videoWriteStr
     jmp .error
-    
+
   .fileNotFound:
     mov si, badCommandErr
     call videoWriteStr
     jmp .error
-    
+
   .memError:
     mov si, memoryErr
     call videoWriteStr
-    
+
   .error:
     pop ds                                      ; Restore registers
     pop es
@@ -1358,16 +1357,15 @@ doLoad:
 
     jmp cliLoop
 
-    
+
 doDump:
-    
     mov si, bx
     mov bx, 10
     call atoi
     mov si, .buffer
     mov bx, 10
     call itoa
-    
+
     mov si, bx
     mov bx, 10
     call atoi
@@ -1387,12 +1385,11 @@ doDump:
     call videoRestoreScreen
     pop word [curY]
 
-    
     jmp cliLoop
-.buffer times 32 db 0
-.buffer2 times 32 db 0
 
-    
+  .buffer times 32 db 0
+  .buffer2 times 32 db 0
+
 ;---------------------------------------------------
 doWarranty:
 ;
@@ -1404,13 +1401,13 @@ doWarranty:
 ;
 ;---------------------------------------------------
     push si
-    
+
     mov si, __GPL_WARRANTY
     call videoWriteStr
 
     pop si
     jmp cliLoop
-    
+
 ;---------------------------------------------------
 doRedistrib:
 ;
@@ -1422,13 +1419,13 @@ doRedistrib:
 ;
 ;---------------------------------------------------
     push si
-    
+
     mov si, __GPL_REDISTRIB
     call videoWriteStr
 
     pop si
     jmp cliLoop
-    
+
 ;---------------------------------------------------
 driveToAscii:
 ;

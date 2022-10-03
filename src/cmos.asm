@@ -1,6 +1,6 @@
 ;  cmos.asm
 ;
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -33,7 +33,7 @@
 %define CMOS_STATUS_REG_B        0x0b   
 %define CMOS_STATUS_REG_C        0x0c   
 %define CMOS_STATUS_REG_D        0x0d
-    
+
 %define CMOS_DIAGNOSTIC_STATUS   0x0e           ; CMOS memory registers
 %define CMOS_SHUTDOWN_STATUS     0x0f
 %define CMOS_FLOPPY_DRIVE_TYPES  0x10
@@ -45,10 +45,10 @@
 %define CMOS_LOW_MEMORY_MSB      0x16
 %define CMOS_HIGH_MEMORY_LSB     0x17
 %define CMOS_HIGH_MEMORY_MSB     0x18
-    
+
 %define NMI_DISABLE_BIT          0x01 
 %define NMI_ENABLE_BIT           0x00
-    
+
 ;---------------------------------------------------
 cmosRead:
 ;
@@ -61,7 +61,7 @@ cmosRead:
 ;---------------------------------------------------
     push bx
     mov al, bl
-    
+
     cli                                         ; Disable interrupts
     or al, NMI_DISABLE_BIT << 7                 ; Disable NMI
     out CMOS_ADDRESS_PORT, al                   ; Access the CMOS memory address
@@ -89,7 +89,7 @@ cmosWrite:
 ;
 ;---------------------------------------------------
     push ax
-    
+
     cli                                         ; Disable interrupts
     or al, NMI_DISABLE_BIT << 7                 ; Disable NMI
     out CMOS_ADDRESS_PORT, al                   ; Access the CMOS memory address
@@ -121,7 +121,7 @@ cmosReadDate:
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     xor ch, ch
     mov cl, al
     cmp cl, 80                                  ; Check for either 1980s or 2000s
@@ -139,13 +139,13 @@ cmosReadDate:
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     mov dh, al
     mov al, CMOS_RTC_DAY_OF_MONTH               ; Read the current day of the month from the RTC
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     mov dl, al
     mov al, CMOS_RTC_DAY_OF_WEEK                ; Read the current day of the week from the RTC
     call cmosRead
@@ -153,9 +153,9 @@ cmosReadDate:
     call bcd
 
     xor ah, ah
-    
+
     ret
-    
+
 ;---------------------------------------------------
 cmosReadTime:
 ;
@@ -174,26 +174,26 @@ cmosReadTime:
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     mov ch, al
     mov al, CMOS_RTC_MINUTES                    ; Read the minutes from the RTC
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     mov cl, al
     mov al, CMOS_RTC_SECONDS                    ; Read the seconds from the RTC
     call cmosRead
     mov al, ah                                  ; Convert into a binary coded decimal
     call bcd
-    
+
     mov dh, al
     xor dl, dl
-    
+
     pop ax                                      ; Restore register
-    
+
     ret
-        
+
 ;---------------------------------------------------
 cmosDelay:
 ;
@@ -206,20 +206,20 @@ cmosDelay:
 ;---------------------------------------------------
     push ax                                     ; Save registers
     push bx
-    
+
   .while:
     mov al, CMOS_RTC_SECONDS                    ; Read the seconds from the RTC
     call cmosRead
 
     mov bh, ah                                  ; Current seconds
-    
+
   .wait:
     mov al, CMOS_RTC_SECONDS                    ; Read the seconds from the RTC
     call cmosRead
-    
+
     cmp ah, bh                                  ; Wait for the next value from the RTC
     je .wait
-    
+
     loop .while
 
     pop bx                                      ; Restore registers
@@ -242,7 +242,7 @@ bcd:
     xor dx, dx
     xor bx, bx
     xor ah, ah
-    
+
     push ax                                     ; Calculate ((x & 0xf0) >> 4) * 10
     and ax, 0xf0                                ; Get higher BCD bits
     shr al, 1                                   ; Rotate right by 4 bits

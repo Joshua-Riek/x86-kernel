@@ -1,7 +1,6 @@
 ;  kernel.asm
 ;
-;  Entry point into the operating system
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -19,7 +18,7 @@
 
     %define BOOT_SEG   0x07c0                   ; (BOOT_SEG   << 4) + BOOT_OFF   = 0x007c00
     %define BOOT_OFF   0x0000
-    
+
     %define STACK_SEG  0x0f00                   ; (STACK_SEG  << 4) + STACK_OFF  = 0x010000
     %define STACK_OFF  0x1000
 
@@ -33,7 +32,7 @@
 
     bits 16                                     ; Ensure 16-bit code, because fuck 32-bit
     cpu  8086                                   ; Assemble with the 8086 instruction set
-    
+
 ;---------------------------------------------------
 ; Kernel entry-point
 ;---------------------------------------------------
@@ -45,31 +44,30 @@ entryPoint:
     mov ax, KERNEL_SEG                          ; Set segments to the location of the bootloader
     mov ds, ax
     mov es, ax
-    
+
     cli
     mov ax, STACK_SEG                           ; Get the the defined stack segment address
     mov ss, ax                                  ; Set segment register to the bottom  of the stack
     mov sp, STACK_OFF                           ; Set ss:sp to the top of the 4k stack
     sti
-     
+
     mov byte [drive], dl                        ; Save the boot drive number
 
     call setupVideo                             ; Grab the cursor pos and screen info from bios
 
+    call setupKbdCtrl                           ; Setup the keyboard manager
+    
     call setupInt0x21                           ; Setup my dos emulation
-           
+
     call setupDisk                              ; Setup the disk manager
     jc .diskError
 
     call setupMemory                            ; Setup the memory manager
     jc .memError
-    
-    call setupKbdCtrl                           ; Setup the keyboard manager
-    jc .kbdError
 
     mov si, __CURRENT_BUILD                     ; Get the address of the current build string
     call videoWriteStr
-    
+
     mov si, __GPL_NOTICE                        ; Get the address of the gpl3 header notice
     call videoWriteStr
 
@@ -83,7 +81,7 @@ entryPoint:
     mov si, .memErrorMsg                        ; Tell the user that their was a mem error
     call videoWriteStr                          ; Write string to standard output
     jmp .reboot
-        
+
   .kbdError:
     mov si, .kbdErrorMsg                        ; Tell the user that their was a kbd error
     call videoWriteStr                          ; Write string to standard output
@@ -99,9 +97,9 @@ entryPoint:
     call videoWriteStr                          ; Write string to standard output
 
     call videoUpdateBiosCur                     ; Update the bios cursor before reboot
-    
+
     call kbdCtrlWaitUntillKey                   ; Get a single keypress
-    
+
     mov ah, 0x0e                                ; Teletype output
     mov al, 0x0d                                ; Carriage return
     int 0x10                                    ; Video interupt
@@ -124,37 +122,37 @@ entryPoint:
 ; Included files
 ;---------------------------------------------------
 
-%include "src\_succ.inc"
-%include "src\keyboard.asm"
-%include "src\string.asm"
-%include "src\memory.asm"    
-%include "src\serial.asm"
-%include "src\video.asm"
-%include "src\cmos.asm"
-%include "src\disk.asm"
-%include "src\test.asm"
-%include "src\math.asm"
-%include "src\fat.asm"
-%include "src\cli.asm"
-%include "src\dos.asm"
-    
+%include "src/_succ.inc"
+%include "src/keyboard.asm"
+%include "src/string.asm"
+%include "src/memory.asm"
+%include "src/serial.asm"
+%include "src/video.asm"
+%include "src/cmos.asm"
+%include "src/disk.asm"
+%include "src/test.asm"
+%include "src/math.asm"
+%include "src/fat.asm"
+%include "src/cli.asm"
+%include "src/dos.asm"
+
 ;---------------------------------------------------
 ; Main kernel varables below
 ;---------------------------------------------------
 
 __CURRENT_BUILD db "SuccOS kernel ", __SUCC_VERSION," [compiled on ", __DATE__, "]", 10, 13, 10, 13, 0
-    
-__GPL_NOTICE    db "Copyright (c) 2017-2020 Joshua Riek", 10, 13,
+
+__GPL_NOTICE    db "Copyright (c) 2017-2022 Joshua Riek", 10, 13,
                 db "This program comes with ABSOLUTELY NO WARRANTY; for details", 10, 13
                 db "type 'warranty'. This is free software, and you are welcome to", 10, 13
                 db "redistribute it under certain conditions; type 'redistrib'", 10, 13
                 db "for details.", 10, 13, 10, 13, 0
-      
+
 __GPL_REDISTRIB db "This program is free software: you can redistribute it and/or modify", 10, 13,
                 db "it under the terms of the GNU General Public License as published by", 10, 13,
                 db "the Free Software Foundation, either version 3 of the License, or", 10, 13,
                 db "(at your option) any later version.", 10, 13, 0
-    
+
 __GPL_WARRANTY  db "This program is distributed in the hope that it will be useful,", 10, 13,
                 db "but WITHOUT ANY WARRANTY; without even the implied warranty of", 10, 13,
                 db "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the", 10, 13,

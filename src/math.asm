@@ -1,7 +1,6 @@
 ;  math.asm
 ;
-;  Math is pain.  
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -31,7 +30,7 @@ u32x16mul:
 ;---------------------------------------------------
     push bx                                     ; Save registers
     push cx
-    
+
     mov cx, dx                                  ; Save the hi word of the multiplicand
     xor dx, dx
     mul bx                                      ; Multiply the low word of the multiplicand by the multiplier
@@ -42,15 +41,15 @@ u32x16mul:
     pop bx
     add ax, bx                                  ; Add the partial product 
     adc dx, 0                                   ; Adjust if carry
-    
+
     mov dx, cx
     xchg dx, ax
 
     pop cx                                      ; Restore registers
     pop bx
-    
+
     ret
-    
+
 ;---------------------------------------------------
 s32x16mul:
 ;
@@ -67,7 +66,7 @@ s32x16mul:
     push cx
     push si
     push di
-    
+
     cmp dx, 1 << 15                             ; Check for the sign bit
     cmc                                         ; Complement carry flag for sign
     sbb si, si                                  ; Set the sign to use (dest - (src + CF))
@@ -112,7 +111,7 @@ u32x16div:
 ;---------------------------------------------------
     push bx                                     ; Save registers
     push cx
-    
+
     mov cx, ax                                  ; Save the low word of the dividend
     mov ax, dx
     xor dx, dx                                  ; Divide the hi word of the dividend by the divisor
@@ -125,9 +124,9 @@ u32x16div:
 
     pop cx                                      ; Restore register
     pop bx
-    
+
     ret
-    
+
 ;---------------------------------------------------
 s32x16div:
 ;
@@ -144,7 +143,7 @@ s32x16div:
     push cx
     push si
     push di
-    
+
     cmp dx, 1 << 15                             ; Check for the sign bit
     cmc                                         ; Complement carry flag for sign
     sbb si, si                                  ; Set the sign to use (dest - (src + CF))
@@ -197,14 +196,14 @@ u32x32div:
     mov bx, ax
     mov cx, ax
     mov dx, ax
-    
+
     ret
 
   .binaryDiv:                                   ; Divide a 32-bit number by a 32-bit number
     push si                                     ; Save registers
     push di
     push bp
-    
+
     mov bp, 32                                  ; Counter
     xor di, di                                  ; Remainder
     xor si, si
@@ -214,31 +213,31 @@ u32x32div:
     rcl dx, 1                                   ; Shift remainder & quotient by 1 bit R = R << 1
     rcl di, 1
     rcl si, 1
-    
+
     cmp si, cx                                  ; Is remainder greater than or equal to the divisor R >= D
     ja .goesInto                                ; Check the high words of the remainder and divisor
     jb .nextBit                                 ; Then check the low words
     cmp di, bx
     jb .nextBit
-    
+
   .goesInto:
     sub di, bx                                  ; Subtract the remander by the divisor R = R - D
     sbb si, cx
     inc ax                                      ; Set the low bit of the quotient Q(i) = 1
-    
+
   .nextBit:
     dec bp                                      ; Loop untill zero (dec sets zero flag)
     jnz .bitLoop
 
     mov cx, si                                  ; Return the remainder
     mov bx, di                                  ; Quotient allready in dx:ax
-    
+
     pop bp                                      ; Restore registers
     pop di
     pop si
-    
+
     ret
-    
+
 ;---------------------------------------------------
 s32x32div:
 ;
@@ -253,7 +252,7 @@ s32x32div:
 ;---------------------------------------------------
     push si
     push di
-    
+
     cmp dx, 1 << 15                             ; Check for the sign bit
     cmc                                         ; Complement carry flag for sign
     sbb si, si                                  ; Set the sign to use (dest - (src + CF))
@@ -281,7 +280,7 @@ s32x32div:
 
     pop di
     pop si
-    
+
     ret
 
 ;---------------------------------------------------
@@ -302,7 +301,7 @@ u32x16add:
     adc dx, 0                                   ; Adjust the hi word of the first addend if carry 
 
     ret
-    
+
 ;---------------------------------------------------
 s32x16add:
 ;
@@ -320,7 +319,7 @@ s32x16add:
     add ax, bx                                  ; Add the low word of the first addend by the second addend
     adc dx, 0                                   ; Adjust the hi word of the first addend if carry 
     cwd                                         ; Now extend the sign bit to get the sum
-    
+
     ret
 
 ;---------------------------------------------------
@@ -359,9 +358,9 @@ s32x32add:
     add ax, bx                                  ; Add the low word of the first addend by the low word of the second addend
     adc dx, cx                                  ; Add the hi word of the first addend by the hi word of the second addend and adjust carry
     cwd                                         ; Now extend the sign bit to get the sum (not sure if needed for 32x32)
-    
+
     ret
-    
+
 ;---------------------------------------------------
 u32x16sub:
 ;
@@ -419,7 +418,7 @@ u32x32sub:
     sbb dx, cx                                  ; Subtract the hi word of the minuend by the hi word of the subtrahend and adjust carry
 
     ret
-    
+
 ;---------------------------------------------------
 s32x32sub:
 ;
@@ -439,7 +438,7 @@ s32x32sub:
     cwd                                         ; Now extend the sign bit to get the diffrence (not sure if needed for 32x32)
 
     ret
-    
+
 ;---------------------------------------------------
 u32x32mul:
 ;
@@ -458,15 +457,15 @@ u32x32mul:
 
     mov word [.num1+2], dx
     mov word [.num1], ax
-    
+
     mov word [.num2+2], cx
     mov word [.num2], bx
-    
+
     xor dx, dx                                  ; Multiply the Low words
     mov ax, word [.num1]                        ; Low word
     mul word [.num2]                            ; Low word
     mov bx, dx                                  ; Save remander
-    
+
     push ax                                     ; Save Low word
                                                 ; Multiply Low word by the High word
     mov ax, word [.num1]                        ; Low word

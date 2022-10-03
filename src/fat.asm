@@ -1,7 +1,6 @@
 ;  fat.asm
 ;
-;  This file contains FAT12/16 disk functions.  
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -87,7 +86,7 @@ readClustersFAT12:
     mov di, word [.fatSEG]
     mov es, di                                  ; Tempararly set es:di to the FAT12 buffer
     mov di, word [.fatOFF]
-    
+
     clc
     add di, ax                                  ; Point to the next cluster in the FAT12 table
     jnc .grabCluster 
@@ -100,10 +99,10 @@ readClustersFAT12:
 
   .grabCluster:
     mov ax, word [es:di]                        ; Grab the next cluster in the FAT12 table
-    
+
     pop di
     pop es
-       
+
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenCluster
 
@@ -148,12 +147,12 @@ readClustersFAT12:
 
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .loadFatError:
     pop di
     pop es
     jmp .error
-    
+
   .readError:
     pop ax
 
@@ -201,7 +200,7 @@ readClustersFAT16:
 
     push es
     push di
-    
+
     mov dx, cs
     mov ds, dx
 
@@ -231,7 +230,7 @@ readClustersFAT16:
 
     xor dx, dx
     pop ax                                      ; Current cluster number
-     
+
   .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
     mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
     mul bx
@@ -259,7 +258,7 @@ readClustersFAT16:
     mov es, dx
 
     mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
-    
+
     pop di
     pop es
 
@@ -294,17 +293,17 @@ readClustersFAT16:
 
     clc                                         ; Clear carry, for no error
     ret
-    
+
   .loadFatError:
     pop di
     pop es
     jmp .error
-    
+
   .readError:
     pop ax
 
     call unloadFat
-    
+
   .error:  
     pop ds                                      ; Restore registers
     pop es
@@ -341,10 +340,10 @@ readClusters:
     push di
     push es
     push ds
-    
+
     mov dx, cs
     mov ds, dx
-    
+
     mov cx, ax
 
     cmp word [sectors], 0
@@ -354,7 +353,7 @@ readClusters:
     mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
     mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
     jmp .calculateTotalClusters
-    
+
   .smallSectors:                                ; Normally this value should be used.
     mov ax, word [sectors]
     xor dx, dx
@@ -368,7 +367,7 @@ readClusters:
     dec dx
   .div:
     div bx
-    
+
     xchg cx, ax                                 ; Current cluster number
 
     cmp cx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
@@ -499,13 +498,13 @@ removeClustersFAT12:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
   .writeError:
     call unloadFat
-    
+
   .loadFatError:
     pop ds                                      ; Restore registers
     pop es
@@ -518,7 +517,7 @@ removeClustersFAT12:
 
     stc                                         ; Set carry, error occured
     ret
-    
+
 ;--------------------------------------------------
 removeClustersFAT16:
 ;
@@ -578,7 +577,7 @@ removeClustersFAT16:
     mov es, dx
 
     mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
-    
+
     push ax
     and ax, 0x0000
     mov ax, 0
@@ -588,7 +587,7 @@ removeClustersFAT16:
   .nextClusterCalculated:
     pop di
     pop es
-    
+
     cmp ax, 0xfff8
     jae .eof                                    ; Are we at the end of the file?
 
@@ -599,7 +598,7 @@ removeClustersFAT16:
     jc .writeError
 
     call unloadFat
-    
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -609,13 +608,13 @@ removeClustersFAT16:
     pop cx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
   .writeError:
     call unloadFat
-    
+
   .loadFatError:
     pop ds                                      ; Restore registers
     pop es
@@ -648,10 +647,10 @@ removeClusters:
     push di
     push es
     push ds
-    
+
     mov dx, cs
     mov ds, dx
-    
+
     mov cx, ax
 
     cmp word [sectors], 0
@@ -661,7 +660,7 @@ removeClusters:
     mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
     mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
     jmp .calculateTotalClusters
-    
+
   .smallSectors:                                ; Normally this value should be used.
     mov ax, word [sectors]
     xor dx, dx
@@ -675,7 +674,7 @@ removeClusters:
     dec dx
   .div:
     div bx
-    
+
     xchg cx, ax                                 ; Current cluster number
 
     cmp cx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
@@ -684,7 +683,7 @@ removeClusters:
   .FAT16:
     call removeClustersFAT16
     jmp .done
-    
+
   .FAT12:
     call removeClustersFAT12
 
@@ -697,10 +696,10 @@ removeClusters:
     pop cx
     pop bx
     pop ax
-    
+
     ret
 
-;--------------------------------------------------    
+;--------------------------------------------------
 writeClustersFAT12:
 ;
 ; Take the data from location es:di and write it
@@ -715,7 +714,7 @@ writeClustersFAT12:
 ; Returns:    CX = Cluster
 ;             CF = Carry Flag set on error
 ;
-;--------------------------------------------------    
+;--------------------------------------------------
     push ax                                     ; Save registers
     push bx
     push dx
@@ -731,10 +730,10 @@ writeClustersFAT12:
     push di
     pop word [.loadOFF]
     pop word [.loadSEG]
-    
+
     mov si, .freeClusters
     mov cx, 512
-    
+
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
     inc si                                      ; this function
@@ -750,13 +749,13 @@ writeClustersFAT12:
     or dx, dx
     jz .loadFat                                 ; Add one if remander 
     inc ax
-    
+
   .loadFat:
     mov word [.clustersNeeded], ax
     mov dx, ax
 
     ;mov si, .tmpName 
-    ;call createFile                             ; Create the file to write
+    ;call createFile                            ; Create the file to write
     ;jc .createFileError
 
     cmp dx, 0                                   ; If no clusters are needed, do nothing
@@ -768,7 +767,6 @@ writeClustersFAT12:
     push es
     push di
 
-    ; FAT16 add di, 4
     add di, 3                                   ; Skip the fist two clusters
     mov bx, 2                                   ; Current cluster counter
     mov cx, word [.clustersNeeded]              ; Clusters needed
@@ -776,8 +774,7 @@ writeClustersFAT12:
 
   .findFreeCluster:
     mov ax, word [es:di]                        ; Grab the next word in FAT
-    add di, 2
-    ; TODO: OVERFLOW ERROR
+    add di, 2                                   ; TODO: OVERFLOW ERROR?
     
     and ax, 0x0fff                              ; Mask out for even cluster
     jz .foundFreeEven                           ; If zero, entry is free 
@@ -785,11 +782,9 @@ writeClustersFAT12:
   .moreOdd:
     inc bx                                      ; If not free, increase cluster counter
     dec di                                      ; Decrease counter byte in FAT
-    ; TODO: OVERFLOW ERROR
 
     mov ax, word [es:di]                        ; Grab the next word in FAT
-    add di, 2
-    ; TODO: OVERFLOW ERROR
+    add di, 2                                   ; TODO: OVERFLOW ERROR?
 
     shr ax, 1                                   ; Shift out for odd cluster
     shr ax, 1
@@ -816,7 +811,7 @@ writeClustersFAT12:
     inc dx                                      ; If not, continute to next cluster 
     inc dx
     jmp .moreOdd
-    
+
   .foundFreeOdd:
     push si
     mov si, .freeClusters
@@ -834,18 +829,18 @@ writeClustersFAT12:
 
   .freeClustersFound:
     mov si, .freeClusters
-    
+
     mov cx, 0
     mov word [.count], 1
     mov ax, word [.clustersNeeded]
     pop di
     pop es
-     
+
   .chainClusterLoop:
     push si                                     ; Now we must begin to write the cluster
     mov si, .freeClusters                       ; chain into the FAT12 table
     add si, cx
-    
+
     xor dx, dx
     mov ax, word [ds:si]
     pop si
@@ -863,7 +858,7 @@ writeClustersFAT12:
     clc
     add di, ax                                  ; Point to the next cluster in the FAT12 table
     jnc .loadNextCluster2
-    
+
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
@@ -878,7 +873,7 @@ writeClustersFAT12:
 
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenCluster
-    
+
   .oddCluster:
     push si
     mov si, .freeClusters                       ; Our chain into the FAT12 table
@@ -918,30 +913,29 @@ writeClustersFAT12:
     inc cx
     inc cx
     jmp .chainClusterLoop
-    
+
   .lastCluster:
     or dx, dx                                   ; Double check to see if the last cluster
     jz .evenLast                                ; is even or odd
 
   .oddLast:
-    ;TODO: Potental error, not sure why i dont add 0xff80
-    and ax, 0x000f
+    and ax, 0x000f                              ;TODO: Potental error, not sure why i dont add 0xff80
     ;add ax, 0xff80
     add ax, 0xfff0
     jmp .chainDone
-    
+
   .evenLast:
     and ax, 0xf000
     add ax, 0xff8
-    
+
   .chainDone:
     mov word [es:di], ax                        ; Finally store the last cluster into the FAT12 table
     pop di
     pop es
-    
+
     call writeFat                               ; Then write the new FAT12 table to the disk 
     jc .writeFatError
-    
+
     call unloadFat                              ; Kiss that FAT ass goodbye and unallocate it from mem
 
     mov di, word [.loadSEG]
@@ -950,9 +944,9 @@ writeClustersFAT12:
 
   .checkDir:
     ;mov cx, word [cwdCluster]
-    ;cmp cx, 0                                   ; When cwd cluster is zero, its the root dir
+    ;cmp cx, 0                                  ; When cwd cluster is zero, its the root dir
     ;je .foo
-    
+
     mov cl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
     cmp cl, 0x10                                ; Check to see if its a directory
     jne .saveData
@@ -973,7 +967,7 @@ writeClustersFAT12:
     add si, cx                                  ; Grab the next word in our FAT12 table
     mov ax, word [ds:si]
     pop si
-    
+
     cmp ax, 0                                   ; Check for the last cluster to write
     je .fileSaved
 
@@ -994,22 +988,22 @@ writeClustersFAT12:
 
     pop cx
     pop ax
-    
+
     clc
     add di, word [bytesPerCluster]              ; Point to the next portion of data to write
     jnc .saveNextCluster
-    
+
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
 
-  .saveNextCluster:        
+  .saveNextCluster:
     inc cx
     inc cx
     jmp .saveLoop
-    
+
   .fileSaved:
   .fileZero:
     mov cx, word [.freeClusters]
@@ -1021,7 +1015,7 @@ writeClustersFAT12:
     pop dx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1053,7 +1047,7 @@ writeClustersFAT12:
   .clustersNeeded dw 0
   .freeClusters times 512 dw 0
 
-;--------------------------------------------------    
+;--------------------------------------------------
 writeClustersFAT16:
 ;
 ; Take the data from location es:di and write it
@@ -1068,7 +1062,7 @@ writeClustersFAT16:
 ; Returns:    CX = Cluster
 ;             CF = Carry Flag set on error
 ;
-;--------------------------------------------------    
+;--------------------------------------------------
     push ax                                     ; Save registers
     push bx
     push dx
@@ -1085,10 +1079,9 @@ writeClustersFAT16:
     pop word [.loadOFF]
     pop word [.loadSEG]
 
-    ; TODO: dynamic allocation for free cluster list
-    mov si, .freeClusters
+    mov si, .freeClusters                       ; TODO: dynamic allocation for free cluster list
     mov cx, 512
-    
+
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
     inc si                                      ; this function
@@ -1104,7 +1097,7 @@ writeClustersFAT16:
     or dx, dx
     jz .loadFat                                 ; Add one if remander 
     inc ax
-    
+
   .loadFat:
     mov word [.clustersNeeded], ax
     mov dx, ax
@@ -1118,7 +1111,7 @@ writeClustersFAT16:
 
     call loadFat                                ; Allocate and read the FAT16 table into memory
     jc .loadFatError
-    
+
     push es
     push di
 
@@ -1132,7 +1125,7 @@ writeClustersFAT16:
     clc
     add di, 2
     jnc .checkFree
-    
+
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
@@ -1165,22 +1158,22 @@ writeClustersFAT16:
 
   .freeClustersFound:
     mov si, .freeClusters
-    
+
     mov cx, 0
     mov word [.count], 1
     mov ax, word [.clustersNeeded]
     pop di
     pop es
-     
+
   .chainClusterLoop:
     push si                                     ; Now we must begin to write the cluster
     mov si, .freeClusters                       ; chain into the FAT16 table
     add si, cx
-    
+
     xor dx, dx
     mov ax, word [ds:si]
     pop si
-     
+
   .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
     mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
     mul bx
@@ -1189,7 +1182,7 @@ writeClustersFAT16:
     push es                                     ; Save the current position in memory 
     push di                                     ; For es:di contains the FAT12 location
     push cx
-    
+
     clc
     xor cx, cx
     add di, ax                                  ; Add the offset into the FAT16 table
@@ -1204,7 +1197,7 @@ writeClustersFAT16:
     add dh, cl                                  ; Now we can set the correct segment into the FAT16 table
     mov es, dx
     pop cx
-    
+
   .loadNextCluster2:  
     mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
     mov bx, word [.count]                       ; Check here to see if we have all the
@@ -1217,7 +1210,7 @@ writeClustersFAT16:
     mov bx, word [ds:si+2]                      ; Get the NEXT cluster
     pop si
     add ax, bx
-    
+
     mov word [es:di], ax                        ; Store the cluster back into the loaded FAT16 table
     pop di
     pop es
@@ -1226,18 +1219,18 @@ writeClustersFAT16:
     inc cx
     inc cx
     jmp .chainClusterLoop
-    
+
   .lastCluster:
     mov ax, 0xffff
-        
+
   .chainDone:
     mov word [es:di], ax                        ; Finally store the last cluster into the FAT16 table
     pop di
     pop es
-    
+
     call writeFat                               ; Then write the new FAT16 table to the disk 
     jc .writeFatError
-    
+
     call unloadFat                              ; Kiss that FAT ass goodbye and unallocate it from mem
 
     mov di, word [.loadSEG]
@@ -1246,9 +1239,9 @@ writeClustersFAT16:
 
   .checkDir:
     ;mov cx, word [cwdCluster]
-    ;cmp cx, 0                                   ; When cwd cluster is zero, its the root dir
+    ;cmp cx, 0                                  ; When cwd cluster is zero, its the root dir
     ;je .foo
-    
+
     mov cl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
     cmp cl, 0x10                                ; Check to see if its a directory
     jne .saveData
@@ -1269,7 +1262,7 @@ writeClustersFAT16:
     add si, cx                                  ; Grab the next word in our FAT16 table
     mov ax, word [ds:si]
     pop si
-    
+
     cmp ax, 0                                   ; Check for the last cluster to write
     je .fileSaved
 
@@ -1290,22 +1283,22 @@ writeClustersFAT16:
 
     pop cx
     pop ax
-    
+
     clc
     add di, word [bytesPerCluster]              ; Point to the next portion of data to write
     jnc .saveNextCluster
-    
+
     push dx                                     ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
 
-  .saveNextCluster:        
+  .saveNextCluster:
     inc cx
     inc cx
     jmp .saveLoop
-    
+
   .fileSaved:
   .fileZero:
     mov cx, word [.freeClusters]
@@ -1317,7 +1310,7 @@ writeClustersFAT16:
     pop dx
     pop bx
     pop ax
-    
+
     clc                                         ; Clear carry, for no error
     ret
 
@@ -1348,7 +1341,7 @@ writeClustersFAT16:
   .loadOFF dw 0
   .clustersNeeded dw 0
   .freeClusters times 512 dw 0
-    
+
 ;--------------------------------------------------
 writeClusters:   
 ;
@@ -1402,21 +1395,21 @@ writeClusters:
     dec dx
   .div:
     div bx
-    
+
     xchg cx, ax                                 ; Current cluster number
 
     pop dx
     pop ax
     pop di
     pop es
-    
+
     cmp cx, 4096                                ; Calculate the next FAT12 or FAT16 cluster
     jbe .FAT12
 
   .FAT16:
     call writeClustersFAT16
     jmp .done
-    
+
   .FAT12:
     call writeClustersFAT12
 
@@ -1428,6 +1421,5 @@ writeClusters:
     pop dx
     pop bx
     pop ax
-    
+
     ret
-    

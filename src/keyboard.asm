@@ -1,6 +1,5 @@
 ;  keyboard.asm
 ;
-;  This file handles the keyboard controller.
 ;  Copyright (c) 2017-2020, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
@@ -16,7 +15,7 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-    
+
 %define KBD_CTRL_DATA_PORT             0x60     ; Keyboard controller ports
 %define KBD_CTRL_STATUS_PORT           0x64
 %define KBD_CTRL_COMMAND_PORT          0x64
@@ -155,18 +154,18 @@ setupKbdCtrl:
 
     xor ax, ax                                  ; Clear ax
     mov es, ax                                  ; Set extra segment to zero
-    
+
     cli
     mov word [es:0x09*4], kbdCtrlHandler        ; Offset of interupt handler
     mov word [es:0x09*4+2], cs                  ; Segment of interupt handler
     sti
 
-    ;call kbdCtrlSelfTest                        ; Run a keyboard self test, result in carry flag
+    ;call kbdCtrlSelfTest                       ; Run a keyboard self test, result in carry flag
 
     pop es                                      ; Restore registers
     pop ax
     ret
-    
+
 ;---------------------------------------------------
 kbdCtrlRead:
 ;
@@ -191,7 +190,7 @@ kbdCtrlRead:
     sti                                         ; Allow for interrupts again
 
     ret
-    
+
 ;---------------------------------------------------
 kbdCtrlWrite:
 ;
@@ -221,7 +220,7 @@ kbdCtrlWrite:
 
     pop dx
     ret
-    
+
 ;---------------------------------------------------
 kbdCtrlSendCmd:
 ;
@@ -245,7 +244,7 @@ kbdCtrlSendCmd:
     mov al, bl                                  ; Grab the command to send to the kbd ctrl
     out KBD_CTRL_COMMAND_PORT, al               ; Send the command via command port
     IO_DELAY
-    
+
   .accept:                                      ; Same as kbdCtrlSendCmd.wait, this is just 
     in al, KBD_CTRL_STATUS_PORT                 ; a safeguard to ensure that the kbd ctrl has
     IO_DELAY                                    ; accepted the command sent
@@ -256,8 +255,7 @@ kbdCtrlSendCmd:
 
     pop ax
     ret
-    
-    
+
 ;---------------------------------------------------
 kbdCtrlSelfTest:
 ;
@@ -301,7 +299,7 @@ kbdCtrlSelfTest:
     pop bx                                      ; Restore registers
     pop ax
     ret
-    
+
 ;---------------------------------------------------
 kbdCtrlSetLeds:
 ;
@@ -334,7 +332,7 @@ kbdCtrlSetLeds:
     pop bx
     pop ax
     ret
-        
+
 ;---------------------------------------------------
 kbdCtrlWaitUntillKey:
 ;
@@ -429,7 +427,7 @@ kbdCtrlCaptureInput:
     ;dec byte [curX]
     call videoUpdateCur
     pop ds
-    
+
     jmp .loop
 
   .done:
@@ -446,7 +444,7 @@ kbdCtrlCaptureInput:
     pop bx
     pop ax
     ret
-    
+
 ;---------------------------------------------------
 kbdCtrlHandler:
 ;
@@ -540,7 +538,7 @@ kbdCtrlHandler:
     je .toggleNumlock
     cmp al, 0x46                                ; Check for the scrlock scan code
     je .toggleScrlock
-    
+
     call scanToAscii                            ; Now, convert to ascii
     mov word [lastKey], ax                      ; Store the last scan and ascii code
 
@@ -550,13 +548,13 @@ kbdCtrlHandler:
     call kbdBiosStoreKey
     pop cx
     pop ax
-    
+
     jmp .done
-    
+
   .setCtrlState:                                ; Set the ctrl state bit
     or byte [kbdFlags], KBD_FLAGS_CTRL_MASK
     jmp .done
-    
+
   .setLShiftState:                              ; Set the left shift state bit
     or byte [kbdFlags], KBD_FLAGS_LSHIFT_MASK
     jmp .done
@@ -564,11 +562,11 @@ kbdCtrlHandler:
   .setRShiftState:                              ; Set the right shift state bit
     or byte [kbdFlags], KBD_FLAGS_RSHIFT_MASK
     jmp .done
-    
+
   .setAltState:                                 ; Set the alt state bit
     or byte [kbdFlags], KBD_FLAGS_ALT_MASK
     jmp .done
-    
+
   .toggleCapslock:                              ; Toggle the capslock flag bit
     xor byte [kbdFlags], KBD_FLAGS_CAPS_MASK
     call kbdCtrlSetLeds                         ; Set kbd leds
@@ -578,7 +576,7 @@ kbdCtrlHandler:
     xor byte [kbdFlags], KBD_FLAGS_NUM_MASK
     call kbdCtrlSetLeds                         ; Set kbd leds
     jmp .done
-    
+
   .toggleScrlock:                               ; Toggle the numlock flag bit
     xor byte [kbdFlags], KBD_FLAGS_SCROLL_MASK
     call kbdCtrlSetLeds                         ; Set kbd leds
@@ -623,7 +621,7 @@ kbdEncSendCmd:
     mov al, bl                                  ; Grab the command to send to the kbd ctrl
     out KBD_ENC_CMD_REG, al                     ; Send the command via command port
     IO_DELAY
-    
+
   .accept:                                      ; Same as kbdCtrlSendCmd.wait, this is just 
     in al, KBD_CTRL_STATUS_PORT                 ; a safeguard to ensure that the kbd ctrl has
     IO_DELAY                                    ; accepted the command sent
@@ -667,14 +665,14 @@ scanToAscii:
     test byte [kbdFlags], KBD_FLAGS_LSHIFT_MASK ; Check for the left shift bit
     jnz .checkShift2
     jmp .checkNumlock
-    
+
   .checkShift2:
     cmp al, 0x21                                ; Check if the key is < ' '
     jb .checkNumlock
     cmp al, 0x7e                                ; Check if the key is > '~'
     ja .checkNumlock
     jmp .doShift
-    
+
   .checkNumlock:
     test al, 0x80                               ; Test for the high bit
     jz .checkCapslock
@@ -683,7 +681,7 @@ scanToAscii:
     cmp al, 0xad                                ; Dont shift if key is '-'
     je .checkCapslock
     jmp .doShift
-    
+
   .checkCapslock:
     test byte [kbdFlags], KBD_FLAGS_CAPS_MASK   ; Check for the caps lock bit
     jz .checkCtrl
@@ -691,14 +689,14 @@ scanToAscii:
     jb .checkCtrl
     cmp al, 0x7a                                ; Check if the key is <= 'z'
     ja .checkCtrl
-      
+
   .doShift:
     and ax, 0x7f
     mov ah, al                                  ; Save the scan code into ah
     xor bh, bh                                  ; Get the scan code into bl for index
     mov bl, ah
     mov al, byte [kbdShiftTable+bx]             ; Get the ascii char from the shift table
-    
+
   .checkCtrl:
     test byte [kbdFlags], KBD_FLAGS_CTRL_MASK   ; Check for the ctrl bit
     jz .checkAlt
@@ -714,7 +712,7 @@ scanToAscii:
 
   .done:
     and al, 0x7f                                ; Clear the highest bit
-    
+
     pop ds
     pop bx                                      ; Restore registers
     ret
@@ -759,7 +757,7 @@ kbdBiosFlushBuffer:
     sti
     pop ax
     pop ds
-    
+
     ret
 
 ;---------------------------------------------------
@@ -783,7 +781,7 @@ kbdBiosCheckBuffer:
 
     sti
     pop ds
-    
+
     ret
 
 ;---------------------------------------------------
@@ -804,13 +802,13 @@ kbdBiosGetChar:
     push bx
     push dx
     cli                                         ; Clear interupts while changing things in the bios data area
-    
+
     xor dx, dx                                  ; Clear for divison
     xor ax, ax                                  ; Ensure ax is clear for the return value
-    
+
     mov bx, BIOS_SEG                            ; Set the data segment to the bios data area
     mov ds, bx
-    
+
     mov bx, word [ds:KEYBOARD_HEAD_PTR]         ; If the keyboard head pointer is equal to the
     cmp bx, word [ds:KEYBOARD_TAIL_PTR]         ; keyboard tail pointer their are no keys in the buffer
     jz .done
@@ -820,7 +818,7 @@ kbdBiosGetChar:
 
     mov bx, word [ds:KEYBOARD_BUFF_END]         ; Subtracted the end and start of the keyboard buffer 
     sub bx, word [ds:KEYBOARD_BUFF_START]       ; This will dertermine the size of the buffer (normally a 16-word FIFO)
-    
+
     add ax, 2                                   ; Point to the next char in the buffer 
     sub ax, word [ds:KEYBOARD_BUFF_START]       ; Calculate the offset for the next char
 
@@ -912,9 +910,9 @@ kbdBiosWaitUntillKey:
     call kbdBiosGetChar                           ; Try to read a key from the bios kbd buffer
     or ax, ax                                 ; When empty, just loop forever and ever :)
     jz .wait
-    
+
     ret
-    
+
 ;---------------------------------------------------
 kbdBiosCaptureInput:
 ;
@@ -973,12 +971,12 @@ kbdBiosCaptureInput:
     ;dec byte [curX]
     call videoUpdateCur
     pop ds
-    
+
     jmp .loop
 
   .done:
     mov byte [ds:si], 0                         ; Ensure string ends with a null byte
-    
+
     mov al, 0x0d                                ; Print out a carriage return
     call videoWriteChar
     mov al, 0x0a                                ; Print out a line feed
@@ -991,9 +989,8 @@ kbdBiosCaptureInput:
     pop ax
     ret
 
-    ; Ctrl break testing below
-    ; looks like shit :)
-    setupInt0x15:
+; Ctrl break testing below
+setupInt0x15:
     push ax                                     ; Save registers
     push es
     

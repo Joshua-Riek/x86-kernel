@@ -1,7 +1,6 @@
 ;  video.asm
 ;
-;  Simple video driver.  
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -396,7 +395,7 @@ videoScroll:
     cmp byte [curY], 25                         ; See if scrolling the screen is even needed
     jnge .done
     
-    mov ax, word [vramAddr]                    ; Video memory segment
+    mov ax, word [vramAddr]                     ; Video memory segment
     mov es, ax
 
     xor ah, ah
@@ -563,7 +562,7 @@ videoRestoreScreen:
     mov ds, si
     lea si, [screen]                            ; Current offset
     
-    mov di, word [vramAddr]                  ; Video memory segment
+    mov di, word [vramAddr]                     ; Video memory segment
     mov es, di 
     mov di, 0                                   ; Video memory offset
 

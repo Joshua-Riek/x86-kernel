@@ -1,7 +1,6 @@
 ;  serial.asm
 ;
-;  Handle serial port stuff
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -21,7 +20,7 @@
 %define COM2 0x2f8 
 %define COM3 0x3e8 
 %define COM4 0x2e8
-    
+
 ;---------------------------------------------------
 initSerial:
 ;
@@ -36,11 +35,11 @@ initSerial:
     push bx
     push cx
     push dx
-    
+
     mov dx, COM1 + 1
     mov al, 0x00                                ; Disable all interrupts
     out dx, al                                  ; Send the data to the port passed
-    
+
     mov dx, COM1 + 3
     mov al, 0x80                                ; Enable DLAB (set baud rate divisor)
     out dx, al                                  ; Send the data to the port passed
@@ -60,11 +59,11 @@ initSerial:
     mov dx, COM1 + 2
     mov al, 0xc7                                ; Enable FIFO, clear them, with 14-byte threshold
     out dx, al                                  ; Send the data to the port passed
-    
+
     mov dx, COM1 + 4
     mov al, 0x0b                                ; IRQs enabled, RTS/DSR set
     out dx, al                                  ; Send the data to the port passed
-    
+
     pop dx                                      ; Restore registers
     pop cx
     pop bx
@@ -104,9 +103,9 @@ writeSerial:
     pop cx
     pop bx
     pop ax
-    
+
     ret
-    
+
 ;---------------------------------------------------
 readSerial:
 ;
@@ -135,13 +134,13 @@ readSerial:
     in al, dx                                   ; Read the data from the port passed
 
     mov ah, ch
-    
+
     pop dx                                      ; Restore registers
     pop cx
     pop ax
-    
+
     ret
-    
+
 ;---------------------------------------------------
 writeSerialStr:
 ;
@@ -165,9 +164,9 @@ writeSerialStr:
   .done:
     pop si                                      ; Restore registers
     pop ax
-    
+
     ret
-    
+
 ;---------------------------------------------------
 writeSerialNumPadding32:
 ;
@@ -218,7 +217,7 @@ writeSerialNumPadding32:
     inc si
     inc di
     loop .zeroLoop
-    
+
     pop es                                      ; Restore registers
     pop ds
     pop di
@@ -227,147 +226,8 @@ writeSerialNumPadding32:
     pop cx
     pop bx
     pop ax
-        
+
     ret
 
   .buffer1 times 32 db 0
   .buffer2 times 32 db 0
-        
-;---------------------------------------------------
-logAllocMem:
-;
-; Log memory allocation to the serial port.
-;
-; Params:  None
-;
-; Returns: None
-;
-;---------------------------------------------------
-    push si
-
-    mov si, addrStr
-    call writeSerialStr
-    
-    call debugPrint
-    
-    pop si
-    ret
-    
-;---------------------------------------------------
-logFreeMem:
-;
-; Log memory unallocation to the serial port.
-;
-; Params:  None
-;
-; Returns: None
-;
-;---------------------------------------------------
-    push si
-    
-    mov si, remStr
-    call writeSerialStr
-
-    call debugPrint
-    pop si
-    ret
- 
-debugPrint: 
-    push ax                                     ; Save registers
-    push bx
-    push cx
-    push dx
-    push si
-    push di
-    push es
-    push ds
-
-    mov cx, cs
-    mov ds, cx
-
-    push ax
-    push dx
-
-    mov ax, es                                  ; Handle the segment addr first
-    xor dx, dx                                  ; Clear remander
-    mov bx, 16                                  ; Shift left
-    mul bx                                      ; Multiplying by 16 is the same as (x << 4)
-
-    clc
-    add ax, di                                  ; Add the offset addr to the segment addr
-    jnc .noCarry1                               ; Check for carry
-    
-    inc dx                                      ; Correct segment for 64k boundry
-
-  .noCarry1:
-    mov bx, 16
-    mov cl, '0'
-    mov ch, 5
-    call writeSerialNumPadding32
-
-    mov al, '-'
-    call writeSerial
-    mov al, '0'
-    call writeSerial
-    mov al, 'x'
-    call writeSerial
-
-    pop dx
-    pop ax
-
-    push ax
-    push dx
-
-    call memAddressToBlock                      ; Convert address to block/ index
-    call memBytesToBlocks32                     ; Convert size in bytes to size in blocks
-    add cx, bx
-    call memBlockToAddress
-    
-    mov ax, es                                  ; Handle the segment addr first
-    xor dx, dx                                  ; Clear remander
-    mov bx, 16                                  ; Shift left
-    mul bx                                      ; Multiplying by 16 is the same as (x << 4)
-
-    clc
-    add ax, di                                  ; Add the offset addr to the segment addr
-    jnc .noCarry2                               ; Check for carry
-    
-    inc dx                                      ; Correct segment for 64k boundry
-
-  .noCarry2:
-    mov bx, 16
-    mov cl, '0'
-    mov ch, 5
-    call writeSerialNumPadding32
-
-    mov si, lenStr
-    call writeSerialStr
-
-    pop dx
-    pop ax
-    xchg ax, dx
-    mov bx, 10
-    mov cl, ' '
-    mov ch, 0
-    call writeSerialNumPadding32
-
-    mov al, 10
-    call writeSerial
-    mov al, 13
-    call writeSerial
-    
-    pop ds                                      ; Restore registers
-    pop es
-    pop di
-    pop si
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-    addrStr db "[+] Allocated address:   0x", 0
-    lenStr  db " => Size in Bytes: ", 0
-    remStr  db "[-] Unallocated address: 0x", 0
-
- 

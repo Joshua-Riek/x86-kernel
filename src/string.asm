@@ -1,7 +1,6 @@
 ;  string.asm
 ;
-;  System functions for string handling.  
-;  Copyright (c) 2017-2020, Joshua Riek
+;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
 ;  it under the terms of the GNU General Public License as published by
@@ -375,7 +374,7 @@ convertFilename83:
 
     xor cx, cx                                  ; Handle the first 8 chars
 
-.dot:
+  .dot:
     mov al, byte [ds:si]
     cmp al, '.'
     jne .copyFilename
@@ -385,24 +384,27 @@ convertFilename83:
     inc cx                                      ; Increase counter
 
     mov ax, word [ds:si]
-    cmp word [ds:si], 0x002e                              ; '..'
+    cmp word [ds:si], 0x002e
     je .2dot
 
-    cmp byte [ds:si], 0                                   ; '.'
-    jne .b
+    cmp byte [ds:si], 0
+    jne .copy
 
     lodsb
 
     jmp .padExt
-.2dot:
+
+  .2dot:
     lodsb
     stosb
     lodsb
     inc cx
 
-jmp .padExt
-.b:
+    jmp .padExt
+
+  .copy:
     xor cx, cx                                  ; Handle the first 8 chars
+
   .copyFilename:
     lodsb                                       ; Load the a byte from si
     call charToUpper
@@ -621,7 +623,7 @@ findSpace:
     inc si
     cmp al, 0                                   ; Check for the end of the string
     je .end
-    cmp al, ' '                                  ; Check for a space
+    cmp al, ' '                                 ; Check for a space
     je findSpace
 
     clc
@@ -766,12 +768,12 @@ charToUpper:
 ;
 ;--------------------------------------------------
     cmp al, 97
-    jl .done                                  ; Check if the input is a uppercase letter (ax >= 97 && ax <= 122)
+    jl .done                                    ; Check if the input is a uppercase letter (ax >= 97 && ax <= 122)
     cmp al, 122
     jng .sub32
 
   .sub32:
-    sub al, 32                                ; Subtract the number 32 to make the char uppercase
+    sub al, 32                                  ; Subtract the number 32 to make the char uppercase
 
   .done:
     ret
