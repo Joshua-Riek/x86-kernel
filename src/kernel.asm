@@ -36,9 +36,8 @@
 ;---------------------------------------------------
 ; Kernel entry-point
 ;---------------------------------------------------
-main:
-global entryPoint
-entryPoint:
+global _start
+_start:
     jmp KERNEL_SEG:$+5                          ; Fix the cs:ip registers
 
     mov ax, KERNEL_SEG                          ; Set segments to the location of the bootloader

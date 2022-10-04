@@ -36,19 +36,31 @@ BINDIR        = ./bin
 CFLAGS       +=
 LDFLAGS      +=
 ARFLAGS      +=
-LDFLAGS      += -e entryPoint -m elf_i386 -Ttext=0x1000
-NASMFLAGS    += -O0 -f elf -g3 -F dwarf
+LDFLAGS      += -m elf_i386
+NASMFLAGS    += -f elf -g3 -F dwarf
 OBJCOPYFLAGS += -O binary
 
-# Disk image file
-DISKIMG       = floppy.img
+# This is just for make to re-compile when there is a change
+INCLUDES = $(SRCDIR)/cli.asm \
+		   $(SRCDIR)/cmos.asm \
+		   $(SRCDIR)/disk.asm \
+		   $(SRCDIR)/dos.asm \
+		   $(SRCDIR)/fat.asm \
+		   $(SRCDIR)/keyboard.asm \
+		   $(SRCDIR)/math.asm \
+		   $(SRCDIR)/memory.asm \
+		   $(SRCDIR)/serial.asm \
+		   $(SRCDIR)/string.asm \
+		   $(SRCDIR)/test.asm \
+		   $(SRCDIR)/video.asm
+
 
 # Set phony targets
-.PHONY: all clean clobber kernel install-linux install-win debug run
+.PHONY: all clean clobber kernel install boot12 boot16 debug run
 
 
 # Rule to make targets
-all: kernel
+all: kernel install
 
 
 # Makefile target for the kernel
@@ -58,63 +70,75 @@ $(BINDIR)/kernel.bin: $(BINDIR)/kernel.elf
 	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
 
 $(BINDIR)/kernel.elf: $(OBJDIR)/kernel.o | $(BINDIR)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ $(LDFLAGS) -Ttext=0x1000 -o $@
 
-$(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm | $(OBJDIR)
+$(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm $(INCLUDES) | $(OBJDIR)
+	$(NASM) $< -O0 $(NASMFLAGS) -o $@
+
+
+# Makefile target for the FAT12 bootloader
+boot12: $(BINDIR)/boot12.bin
+
+$(BINDIR)/boot12.bin: $(BINDIR)/boot12.elf
+	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
+
+$(BINDIR)/boot12.elf: $(OBJDIR)/boot12.o | $(BINDIR)
+	$(LD) $^ $(LDFLAGS) -Ttext=0x0000 -o $@
+
+$(OBJDIR)/boot12.o: $(SRCDIR)/boot12.asm | $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
 
+
+# Makefile target for the FAT16 bootloader
+boot16: $(BINDIR)/boot16.bin
+
+$(BINDIR)/boot16.bin: $(BINDIR)/boot16.elf
+	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
+
+$(BINDIR)/boot16.elf: $(OBJDIR)/boot16.o | $(BINDIR)
+	$(LD) $^ $(LDFLAGS) -Ttext=0x0000 -o $@
+
+$(OBJDIR)/boot16.o: $(SRCDIR)/boot16.asm | $(OBJDIR)
+	$(NASM) $^ $(NASMFLAGS) -o $@
+
+
+# Makefile target to create both disk images
+install: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
+
+$(BINDIR)/boot12.img: $(BINDIR)/boot12.bin $(BINDIR)/kernel.bin
+	dd if=/dev/zero of=$@ bs=1024 count=1440 status=none
+	mkfs.vfat -F12 $@ 1> /dev/null
+	mcopy -n -i $@ $(BINDIR)/kernel.bin ::
+	dd if=$< of=$@ bs=1 skip=62 seek=62 conv=notrunc status=none
+
+$(BINDIR)/boot16.img: $(BINDIR)/boot16.bin $(BINDIR)/kernel.bin
+	dd if=/dev/zero of=$@ bs=1024 count=16384 status=none
+	mkfs.vfat -F16 $@ 1> /dev/null
+	mcopy -i $@ $(BINDIR)/kernel.bin ::
+	dd if=$< of=$@ bs=1 skip=62 seek=62 conv=notrunc status=none
+
+
+# Create the obj dir
 $(OBJDIR):
 	@mkdir -p $@
 
+# Create the bin dir
 $(BINDIR):
 	@mkdir -p $@
 
 
 # Clean produced files
 clean:
-	rm -f $(OBJDIR)/* $(BINDIR)/*.bin $(BINDIR)/*.elf
+	rm -f $(OBJDIR)/* $(BINDIR)/*
 
 # Clean files from emacs
 clobber: clean
 	rm -f $(SRCDIR)/*~ $(SRCDIR)\#*\# ./*~
 
 
-# Fix for error "cp: cannot create regular file"
-# mount B: \b
-
-# Write the kernel to a disk image
-install-win: 
-#	cp 720k.img $(DISKIMG)
-	cp 1440k.img $(DISKIMG)
-	imdisk -a -f $(DISKIMG) -m B:
-#	cp $(BINDIR)/kernel.bin B:/kernel.bin
-	cp $(BINDIR)/*.bin B:/
-	imdisk -D -m B:
-
-# Write the kernel to a disk image
-install-linux:
-	cp 1440k.img $(DISKIMG)
-	rm -rf tmp-loop
-
-	mkdir tmp-loop
-	mount -o loop -t vfat $(DISKIMG) tmp-loop
-	cp $(BINDIR)/kernel.bin tmp-loop/
-
-	sleep 0.2
-	unmount tmp-loop || exit
-	rm -rf tmp-loop
-
-# Windows fat16 install
-
-#install:
-#	cp $(BINDIR)/kernel.bin B:/kernel.bin
-#	rawcopy -l -m \\\.\B: $(DISKIMG)
-
-
 # Run the disk image
 run:
-	$(QEMU) -serial stdio -rtc base=localtime -fda 1440k.img
-
+	$(QEMU) -serial stdio -rtc base=localtime -fda bin/boot12.img
 
 # Start a debug session with qemu
 debug:

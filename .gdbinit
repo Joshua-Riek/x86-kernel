@@ -1,6 +1,6 @@
 #  .gdbinit
 #
-#  Copyright (c) 2017-2018, Joshua Riek
+#  Copyright (c) 2017-2022, Joshua Riek
 #
 #  This program is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -17,6 +17,8 @@
 #
 
 symbol-file bin/kernel.elf
+set tdesc filename target.xml
+
 target remote localhost:1234
 
 set confirm off
