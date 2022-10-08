@@ -16,38 +16,25 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-    %define BOOT_SEG   0x07c0                   ; (BOOT_SEG   << 4) + BOOT_OFF   = 0x007c00
-    %define BOOT_OFF   0x0000
-
-    %define STACK_SEG  0x0f00                   ; (STACK_SEG  << 4) + STACK_OFF  = 0x010000
-    %define STACK_OFF  0x1000
-
-    %define KERNEL_SEG 0x1000                   ; (KERNEL_SEG << 4) + KERNEL_OFF = 0x001000
-    %define KERNEL_OFF 0x0000
-
-    %ifidn __OUTPUT_FORMAT__, elf               ; WARNING: Assumes that the text segment is set to
-      %define KERNEL_SEG 0x0000                 ; 0x1000, used ONLY for debugging with GDB
-      %define KERNEL_OFF $$
-    %endif
-
-    bits 16                                     ; Ensure 16-bit code, because fuck 32-bit
+    bits 16                                     ; Ensure 16-bit code
     cpu  8086                                   ; Assemble with the 8086 instruction set
 
 ;---------------------------------------------------
 ; Kernel entry-point
 ;---------------------------------------------------
+
 global _start
 _start:
-    jmp KERNEL_SEG:$+5                          ; Fix the cs:ip registers
+    jmp 0x0000:$+5                              ; Fix the cs:ip registers
 
-    mov ax, KERNEL_SEG                          ; Set segments to the location of the bootloader
+    mov ax, 0x0000                              ; Set segments to the location of the bootloader
     mov ds, ax
     mov es, ax
 
     cli
-    mov ax, STACK_SEG                           ; Get the the defined stack segment address
+    mov ax, 0x0f00                              ; Get the the defined stack segment address
     mov ss, ax                                  ; Set segment register to the bottom  of the stack
-    mov sp, STACK_OFF                           ; Set ss:sp to the top of the 4k stack
+    mov sp, 0x1000                              ; Set ss:sp to the top of the 4k stack
     sti
 
     mov byte [drive], dl                        ; Save the boot drive number
@@ -134,6 +121,10 @@ _start:
 %include "src/fat.asm"
 %include "src/cli.asm"
 %include "src/dos.asm"
+
+%ifnidn __OUTPUT_FORMAT__, elf
+    org 0x1000
+%endif
 
 ;---------------------------------------------------
 ; Main kernel varables below

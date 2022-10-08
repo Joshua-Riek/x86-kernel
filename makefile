@@ -142,5 +142,5 @@ run:
 
 # Start a debug session with qemu
 debug:
-	$(QEMU) -serial stdio -rtc base=localtime -S -s -fda $(DISKIMG)
+	$(QEMU) -serial stdio -rtc base=localtime -S -s -fda bin/boot12.img
 

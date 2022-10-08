@@ -1,6 +1,5 @@
 ;  memory.asm
 ;
-;  This file handles memory allocation.  
 ;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
@@ -17,14 +16,11 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-    %define BLOCKS_PER_KB 2
-    %define BLOCK_SIZE    512
-
     loMemMaxBlocks  dw 0
     loMemUsedBlocks dw 0
     loMemMapSeg     dw 0
     loMemMapOff     dw 0
-    kernelSize      dw 0x7000
+    kernelSize      dw 0x8000
     
 ;---------------------------------------------------
 setupMemory:
@@ -54,19 +50,19 @@ setupMemory:
     jc .error
 
     xor dx, dx
-    mov bx, BLOCKS_PER_KB                       ; Take the lower memory size
+    mov bx, 2                                   ; Take the lower memory size
     mul bx                                      ; and multiply, for ammount of blocks
     mov word [loMemMaxBlocks], ax
 
     mov bx, word [kernelSize]                   ; Get the kernel size    
-    add bx, KERNEL_OFF
+    add bx, $$
     mov dx, bx
     xor ax, ax
     call memBytesToBlocks32                     ; Get the num of blocks to allocate (rounded value)
 
     mov ax, bx
 
-    mov bx, BLOCK_SIZE                          ; Get the block size 
+    mov bx, 512                                 ; Get the block size 
     mul bx                                      ; Multiply back to the value
 
     mov di, ax                                  ; Offset for bitmap location
@@ -89,9 +85,9 @@ setupMemory:
                                                 ; Allocate the stack location into memory
     mov ax, 0x0000                              ; Size hi
     mov dx, 0x1000                              ; Size lo
-    mov di, 0x0000
+    mov di, 0x0f00
     mov es, di                                  ; Segment
-    mov di, 0xf000                              ; Offset
+    mov di, 0x1000                              ; Offset
     call allocMemAddress
     jc .error
                                                 ; Allocate the kernel into memory
@@ -99,7 +95,7 @@ setupMemory:
     mov dx, word [kernelSize]                   ; Size lo
     mov di, ds
     mov es, di                                  ; Segment
-    mov di, KERNEL_OFF                          ; Offset
+    mov di, $$                                  ; Offset
     call allocMemAddress
     jc .error
     
@@ -147,7 +143,7 @@ memBytesToBlocks32:
     xor cx, cx
     xchg cx, dx
 
-    mov bx, BLOCK_SIZE                          ; Take the hi word in ax
+    mov bx, 512                                 ; Take the hi word in ax
     div bx                                      ; And divide by bx
     xchg ax, cx                                 ; Handle the lo word
     div bx                                      ; Divide again by bx
@@ -155,7 +151,6 @@ memBytesToBlocks32:
     or dx, dx                                   ; Test for remander
     jz .roundUp                                 ; Jump if zero flag set
     inc ax                                      ; If remander, add one
-    ;inc ax
 
   .roundUp:
     xchg ax, bx
@@ -185,7 +180,7 @@ memBlockToAddress:
 
   .loopBlocks: 
     clc
-    add di, BLOCK_SIZE                          ; Add the block size to the offset
+    add di, 512                                 ; Add the block size to the offset
     jnc .nextBlock                              ; Continue to next block if no carry
 
     push dx
@@ -221,7 +216,7 @@ memAddressToBlock:
     mov ax, es                                  ; Deal with the segment first
 
     xor dx, dx                                  ; Clear remander
-    mov bx, BLOCK_SIZE                          ; Get the the block size
+    mov bx, 512                                 ; Get the the block size
     div bx                                      ; Divide ax:bx
     shl ax, 1                                   ; This is a segment address so shift left
     shl ax, 1
@@ -231,7 +226,7 @@ memAddressToBlock:
 
     xor dx, dx                                  ; Clear remander
     pop ax                                      ; Grab the offset param
-    mov bx, BLOCK_SIZE                          ; Get the block size
+    mov bx, 512                                 ; Get the block size
     div bx                                      ; Divide ax:bx
 
     add cx, ax                                  ; Add the segment and offset
