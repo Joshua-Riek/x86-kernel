@@ -70,9 +70,16 @@ setupDisk:
     push es
     push ds
 
-    xor bx, bx
-    mov si, 0x7c00                              ; Set ds:si to the bootstrap code
-    mov ds, bx
+    clc                                         ; Clear carry flag
+    int 0x12                                    ; Get Conventional memory size in kb
+    jc .error
+
+    mov cl, 6                                   ; Shift bits left (ax*(2^6))
+    shl ax, cl                                  ; Convert the memory to 16-byte paragraphs
+
+    sub ax, 512 >> 4                            ; Reserved 512 bytes for the boot sector
+    mov ds, ax                                  ; Set the data segment register to the boot sector location
+    xor si, si                                  ; Now ds:si points to the bs
 
     mov dl, byte [cs:drive]
     cmp dl, 4                                   ; When booting from a hard drive, you must

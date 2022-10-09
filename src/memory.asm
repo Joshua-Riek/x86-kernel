@@ -49,31 +49,31 @@ setupMemory:
     int 0x12                                    ; Get Conventional memory size
     jc .error
 
+    mov cx, ax
     xor dx, dx
     mov bx, 2                                   ; Take the lower memory size
     mul bx                                      ; and multiply, for ammount of blocks
     mov word [loMemMaxBlocks], ax
 
-    mov bx, word [kernelSize]                   ; Get the kernel size    
-    add bx, $$
-    mov dx, bx
-    xor ax, ax
-    call memBytesToBlocks32                     ; Get the num of blocks to allocate (rounded value)
-
-    mov ax, bx
-
-    mov bx, 512                                 ; Get the block size 
-    mul bx                                      ; Multiply back to the value
-
-    mov di, ax                                  ; Offset for bitmap location
-    ;mov ax, es                                 ; Segment for bitmap location
+    mov ax, cx
+    mov cl, 6                                   ; Shift bits left (ax*(2^6))
+    shl ax, cl                                  ; Convert the memory to 16-byte paragraphs
+    mov bx, word [loMemMaxBlocks]               ; Shift bits right to calculate segment offset
+    mov cl, 4
+    shr bx, cl
+    sub ax, bx                                  ; Reserve bytes for the memory map
+  
+    mov es, ax                                  ; Set the extra segment register to the memory map location
+    xor di, di                                  ; Now es:di points to the memory map
 
     mov word [loMemMapOff], di                  ; Save the bitmap location
     mov word [loMemMapSeg], es
 
     xor ax, ax
-    mov dx, word [loMemMaxBlocks]               ; Allocate the bitmap into memory
-    call allocMemAddress
+    mov dx, word [loMemMaxBlocks]
+    xor cl, cl
+    call memSet                                 ; Zero data before allocating the bitmap into memory
+    call allocMemAddress                        ; Allocate the bitmap into memory
     jc .error
                                                 ; Allocate the bios data area into memory
     mov ax, 0x0000                              ; Size hi
@@ -93,9 +93,9 @@ setupMemory:
                                                 ; Allocate the kernel into memory
     mov ax, 0x0000                              ; Size hi
     mov dx, word [kernelSize]                   ; Size lo
-    mov di, ds
+    mov di, 0x0000
     mov es, di                                  ; Segment
-    mov di, $$                                  ; Offset
+    mov di, 0x1000                              ; Offset
     call allocMemAddress
     jc .error
     
