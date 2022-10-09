@@ -230,7 +230,7 @@ ah_03:
     push dx                                     ; Save register
     mov dh, ah
 
-    call readSerial                             ; Read from the serial port
+    call serialRead                             ; Read from the serial port
 
     mov ah, dh
     pop dx                                      ; Restore register
@@ -250,7 +250,7 @@ ah_04:
     push ax                                     ; Save register
 
     mov al, dl
-    call writeSerial                            ; Write to the serial port
+    call serialWrite                            ; Write to the serial port
 
     pop ax                                      ; Restore register
     iret

@@ -16,12 +16,12 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-    loMemMaxBlocks  dw 0
-    loMemUsedBlocks dw 0
-    loMemMapSeg     dw 0
-    loMemMapOff     dw 0
-    kernelSize      dw 0x8000
-    
+    loMemMaxBlocks  dw 0                        ; Maximum available blocks of memory
+    loMemUsedBlocks dw 0                        ; Current used blocks of memory
+    loMemMapSeg     dw 0                        ; Memory map segment
+    loMemMapOff     dw 0                        ; Memory map offset
+    kernelSize      dw 0x8000                   ; Static kernel size
+
 ;---------------------------------------------------
 setupMemory:
 ;
@@ -438,6 +438,8 @@ memAllocBytes:
     pop cx
     
   .done:
+    ;call logAllocMem
+  
     clc                                         ; No error, so clear carry
     ret
 
@@ -555,6 +557,8 @@ memFreeBytes:
     push ax                                     ; Save registers
     push dx
 
+    ;call logFreeMem
+
     add dx, 0x200                               ; Add 512 bytes to the block
 
     call memBytesToBlocks32
@@ -591,6 +595,8 @@ allocMemAddress:
     push di
     push es
     push ds
+
+    ;call logAllocMem
 
     call memAddressToBlock                      ; Convert address to block/ index
     call memBytesToBlocks32                     ; Convert size in bytes to size in blocks
@@ -724,3 +730,114 @@ memSet:
     pop bx
     pop ax
     ret
+
+;---------------------------------------------------
+logAllocMem:
+;
+; Log memory allocation to the serial port.
+;
+; Expects: ES:DI = Segment:Offset
+;          AX:DX = Size in bytes (Hi:Lo)
+;
+; Returns: None
+;
+;---------------------------------------------------
+    push si
+
+    mov si, .allocrStr
+    call serialWriteStr
+    
+    call logPrint
+    
+    pop si
+    ret
+
+  .allocrStr db "[+] Allocated address:   0x", 0
+    
+;---------------------------------------------------
+logFreeMem:
+;
+; Log memory unallocation to the serial port.
+;
+; Expects: ES:DI = Segment:Offset
+;          AX:DX = Size in bytes (Hi:Lo)
+;
+; Returns: None
+;
+;---------------------------------------------------
+    push si
+    
+    mov si, .unAllocStr
+    call serialWriteStr
+
+    call logPrint
+    pop si
+    ret
+    
+  .unAllocStr  db "[-] Unallocated address: 0x", 0
+
+;---------------------------------------------------
+logPrint:
+;
+; Display address and size to the serial port.
+;
+; Expects: ES:DI = Segment:Offset
+;          AX:DX = Size in bytes (Hi:Lo)
+;
+; Returns: None
+;
+;---------------------------------------------------
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    mov cx, cs
+    mov ds, cx
+
+    push ax
+    push dx
+
+    mov ax, es                                  ; Handle the segment addr first
+    xor dx, dx                                  ; Clear remander
+    mov bx, 0x10                                ; Shift left
+    mul bx                                      ; Multiplying by 16 is the same as (x << 4)
+
+    clc
+    add ax, di                                  ; Add the offset addr to the segment addr
+    adc dx, 0x0000                              ; Check for carry
+    
+    mov bx, 0x10
+    mov cx, 0x0530
+    call serialWriteNumPadding32                ; Display address
+
+    mov si, .lenStr
+    call serialWriteStr
+
+    pop ax
+    pop dx
+    mov bx, 0x000a
+    mov cx, 0x0020
+    call serialWriteNumPadding32                ; Display size
+
+    mov al, 0x0a
+    call serialWrite
+    mov al, 0x0d
+    call serialWrite
+    
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+  .lenStr db " => Size in Bytes: ", 0
+ 

@@ -1031,11 +1031,11 @@ int0x15Hook:
         push ax
 
     mov al, 'b'
-    call writeSerial
+    call serialWrite
         mov al, 13
-    call writeSerial
+    call serialWrite
             mov al, 10
-    call writeSerial
+    call serialWrite
 
     pop ax
     jmp .done2

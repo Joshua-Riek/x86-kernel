@@ -24,7 +24,7 @@
 ;---------------------------------------------------
 initSerial:
 ;
-; Setup the serial com ports
+; Setup the serial ports.
 ;
 ; Expects: Nothing
 ;
@@ -71,9 +71,9 @@ initSerial:
     ret
 
 ;---------------------------------------------------
-writeSerial:
+serialWrite:
 ;
-; Write some data to the serial port
+; Write some data to the serial port.
 ;
 ; Expects: AL    = Data
 ;
@@ -107,9 +107,9 @@ writeSerial:
     ret
 
 ;---------------------------------------------------
-readSerial:
+serialRead:
 ;
-; Read some data from the serial port
+; Read some data from the serial port.
 ;
 ; Expects: Nothing
 ;
@@ -142,9 +142,9 @@ readSerial:
     ret
 
 ;---------------------------------------------------
-writeSerialStr:
+serialWriteStr:
 ;
-; Print out a string to the screen.
+; Print out a string to the serial port.
 ;    
 ; Expects: DS:SI = String to print
 ;
@@ -158,7 +158,7 @@ writeSerialStr:
     lodsb                                       ; Load byte from si to al
     or al, al                                   ; If al is empty stop looping
     jz .done                                    ; Done looping and return
-    call writeSerial                            ; Write the char into the serial port
+    call serialWrite                            ; Write the char into the serial port
     jmp .loop                                   ; Loop untill string is null
 
   .done:
@@ -168,9 +168,9 @@ writeSerialStr:
     ret
 
 ;---------------------------------------------------
-writeSerialNumPadding32:
+serialWriteNumPadding32:
 ;
-; Write a 32-bit number into video memory with padding.
+; Write a 32-bit number to the serial port.
 ;
 ; Expects: AX:DX = Number to display
 ;          BX    = Base of number
@@ -205,7 +205,7 @@ writeSerialNumPadding32:
     call padStr
 
     mov si, .buffer2                            ; Print the buffer that is now padded
-    call writeSerialStr
+    call serialWriteStr
 
     mov si, .buffer1                            ; Finally, take both buffers
     mov di, .buffer2                            ; and clear them for further usage
@@ -231,3 +231,65 @@ writeSerialNumPadding32:
 
   .buffer1 times 32 db 0
   .buffer2 times 32 db 0
+
+;---------------------------------------------------
+serialWriteNumPadding:
+;
+; Write a 16-bit number to the serial port.
+;
+; Expects: AX    = Number to display
+;          BX    = Base of number
+;          CL    = Char to pad with
+;          CH    = Padding length
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push dx                                     ; Save register
+
+    xor dx, dx                                  ; We only want a 16-bit number
+    call serialWriteNumPadding32                ; Now print out the number
+
+    pop dx                                      ; Restore register
+    ret
+
+;---------------------------------------------------
+serialWriteNum32:
+;
+; Write a 32-bit number to the serial port.
+;
+; Expects: AX:DX = Number to display
+;          BX    = Base of number
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push cx                                     ; Save register
+
+    xor cx, cx                                  ; We dont want padding
+    call serialWriteNumPadding32                ; Now print out the 32-bit number
+
+    pop cx                                      ; Restore register
+    ret
+    
+;---------------------------------------------------
+serialWriteNum:
+;
+; Write a 16-bit number to the serial port.
+;
+; Expects: AX    = Number to display
+;          BX    = Base of number
+;
+; Returns: Nothing
+;
+;---------------------------------------------------
+    push cx                                     ; Save registers
+    push dx
+
+    xor dx, dx                                  ; We only want a 16-bit number
+    xor cx, cx                                  ; We dont want padding
+    call serialWriteNumPadding32                ; Now print out the number
+
+    pop dx                                      ; Restore registers
+    pop cx
+    ret
