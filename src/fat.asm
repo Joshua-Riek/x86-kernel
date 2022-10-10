@@ -16,6 +16,20 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
+%define FAT_DIR_FILENAME               0x00     ; Fat dir offsets
+%define FAT_DIR_EXTENSION              0x08
+%define FAT_DIR_ATTRIBUTES             0x0b
+%define FAT_DIR_RESERVED               0x0c
+%define FAT_DIR_CREATION_MS            0x0d
+%define FAT_DIR_CREATION_TIME          0x0e
+%define FAT_DIR_CREATION_DATE          0x10
+%define FAT_DIR_ACCESSED_DATE          0x12
+%define FAT_DIR_CLUSTER_HI             0x14
+%define FAT_DIR_MODIFIED_TIME          0x16
+%define FAT_DIR_MODIFIED_DATE          0x18
+%define FAT_DIR_CLUSTER_LO             0x1a
+%define FAT_DIR_FILESIZE               0x1c
+
 ;--------------------------------------------------
 readClustersFAT12:
 ;
@@ -947,7 +961,7 @@ writeClustersFAT12:
     ;cmp cx, 0                                  ; When cwd cluster is zero, its the root dir
     ;je .foo
 
-    mov cl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    mov cl, byte [es:di+FAT_DIR_ATTRIBUTES]     ; Get the file atribute byte
     cmp cl, 0x10                                ; Check to see if its a directory
     jne .saveData
 
@@ -956,7 +970,7 @@ writeClustersFAT12:
     jne .saveData
 
     mov cx, word [.freeClusters]                ; Update its current cluster
-    mov word [es:di+dirFat.clusterLo], cx
+    mov word [es:di+FAT_DIR_CLUSTER_LO], cx
 
   .saveData:
     mov cx, 0
@@ -1242,7 +1256,7 @@ writeClustersFAT16:
     ;cmp cx, 0                                  ; When cwd cluster is zero, its the root dir
     ;je .foo
 
-    mov cl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    mov cl, byte [es:di+FAT_DIR_ATTRIBUTES]     ; Get the file atribute byte
     cmp cl, 0x10                                ; Check to see if its a directory
     jne .saveData
 
@@ -1251,7 +1265,7 @@ writeClustersFAT16:
     jne .saveData
 
     mov cx, word [.freeClusters]                ; Update its current cluster
-    mov word [es:di+dirFat.clusterLo], cx
+    mov word [es:di+FAT_DIR_CLUSTER_LO], cx
 
   .saveData:
     mov cx, 0

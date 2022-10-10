@@ -271,13 +271,13 @@ doDir:
     inc cx                                      ; Increase counter for files in directory
 
     clc
-    mov ax, word [es:di+dirFat.filesize]        ; Grab the current file's filesize
+    mov ax, word [es:di+FAT_DIR_FILESIZE]       ; Grab the current file's filesize
     add bx, ax                                  ; Add to the total filesize of the dir
     jnc .noCarry
     inc dx                                      ; Increase higher half of the 32-bit filesize
 
   .noCarry:
-    add dx, word [es:di+dirFat.filesize+2]
+    add dx, word [es:di+FAT_DIR_FILESIZE+2]
 
     push bx
     push dx
@@ -306,7 +306,7 @@ doDir:
 
   .printFilesize:
     xor ax, ax
-    mov al, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    mov al, byte [es:di+FAT_DIR_ATTRIBUTES]     ; Get the file atribute byte
     cmp al, 0x10                                ; Check to see if its a directory
     jne .fileEntry
 
@@ -337,8 +337,8 @@ doDir:
     jmp .printDate
 
   .fileEntry:
-    mov ax, word [es:di+dirFat.filesize]        ; Lo word of filesize
-    mov dx, word [es:di+dirFat.filesize+2]      ; Hi word of filesize
+    mov ax, word [es:di+FAT_DIR_FILESIZE]       ; Lo word of filesize
+    mov dx, word [es:di+FAT_DIR_FILESIZE+2]     ; Hi word of filesize
     mov bx, 10                                  ; Decimal int
     mov ch, 10                                  ; Pad length
     mov cl, ' '                                 ; Pad with spaces
@@ -350,7 +350,7 @@ doDir:
     call videoWriteChar
 
   .printDate:
-    mov ax, word [es:di+dirFat.modifiedDate]    ; Grab the date of the file
+    mov ax, word [es:di+FAT_DIR_MODIFIED_DATE]  ; Grab the date of the file
     push ax                                     ; Save the date
 
     and ax, 0000000111100000b                   ; Mask bits for the month
@@ -411,7 +411,7 @@ doDir:
     mov al, ' '
     call videoWriteChar
 
-    mov ax, word [es:di+dirFat.modifiedTime]    ; Grab the time of the file
+    mov ax, word [es:di+FAT_DIR_MODIFIED_TIME]  ; Grab the time of the file
     push ax
 
     and ax, 1111100000000000b                   ; Mask bits for the month

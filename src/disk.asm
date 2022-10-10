@@ -15,7 +15,7 @@
 ;  You should have received a copy of the GNU General Public License
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
-  
+
 bpbBuffer:
     bootJump          times 3 db 0              ; Jump instruction over the OEM / BIOS param block
     OEMName           times 8 db 0              ; Disk label
@@ -44,12 +44,12 @@ bpbBuffer:
     totalClusters     dw 0
     sectorsPerFat     dw 0
     bytesPerCluster   dw 0
-    drive db 0
-    cwdCluster dw 0
-    cwdSEG dw 0
-    cwdOFF dw 0
-    fatSEG dw 0
-    fatOFF dw 0
+    drive             db 0
+    cwdCluster        dw 0
+    cwdSEG            dw 0
+    cwdOFF            dw 0
+    fatSEG            dw 0
+    fatOFF            dw 0
 
 ;---------------------------------------------------
 setupDisk:
@@ -172,7 +172,6 @@ setupDisk:
 
     stc                                         ; Set carry, error occured
     ret
-
 
 ;---------------------------------------------------
 readSectors:
@@ -623,7 +622,7 @@ writeCwd:
 
     xor dx, dx
     xor ax, ax
-    mov ax, word [es:di+dirFat.clusterLo]
+    mov ax, word [es:di+FAT_DIR_CLUSTER_LO]
 
   .search:
     cmp byte [es:di], 0x00                      ; Empty entry Marker
@@ -1166,8 +1165,8 @@ changeDir:
     call searchDir
     jc .fileNotFound
 
-    mov ax, word [es:di+dirFat.clusterLo]       ; Get the file cluster
-    mov bl, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    mov ax, word [es:di+FAT_DIR_CLUSTER_LO]     ; Get the file cluster
+    mov bl, byte [es:di+FAT_DIR_ATTRIBUTES]     ; Get the file atribute byte
 
     call unloadCwd                              ; Free the dir from memory
 
@@ -1243,46 +1242,46 @@ createDir:
     call memAllocBytes
     jc .memoryError
 
-    mov byte [di+dirFat.filename],     '.'
-    mov word [di+dirFat.filename+1],   0x2020   ; Pad filename and ext with spaces
-    mov word [di+dirFat.filename+3],   0x2020
-    mov word [di+dirFat.filename+5],   0x2020
-    mov word [di+dirFat.filename+7],   0x2020
-    mov word [di+dirFat.filename+9],   0x2020
-    mov byte [di+dirFat.attributes],   0x10     ; File attribtutes
-    mov byte [di+dirFat.reserved],     0        ; Reserved for Windows NT usage
-    mov byte [di+dirFat.idk],          0x4c     ; 10-millisecond units past creation time below
-    mov word [di+dirFat.creationTime], 0x6996   ; Time of the file created
-    mov word [di+dirFat.creationDate], 0x5036   ; Date of the file created
-    mov word [di+dirFat.accessedDate], 0x5036   ; Date of last access to the file
-    mov word [di+dirFat.clusterHi],    0        ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+dirFat.modifiedTime], 0x6997   ; Time of the file last modified
-    mov word [di+dirFat.modifiedDate], 0x5036   ; Date of the file last modified
-    mov word [di+dirFat.clusterLo],    0        ; Low starting cluster
-    mov word [di+dirFat.filesize],     0        ; Size of the file
-    mov word [di+dirFat.filesize+2],   0        ;
+    mov byte [di+FAT_DIR_FILENAME],      '.'
+    mov word [di+FAT_DIR_FILENAME+1],    0x2020 ; Pad filename and ext with spaces
+    mov word [di+FAT_DIR_FILENAME+3],    0x2020
+    mov word [di+FAT_DIR_FILENAME+5],    0x2020
+    mov word [di+FAT_DIR_FILENAME+7],    0x2020
+    mov word [di+FAT_DIR_FILENAME+9],    0x2020
+    mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
+    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    0      ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0      ;
 
     add di, 32
     mov cx, word [cwdCluster]
 
-    mov word [di+dirFat.filename],     '..'
-    mov word [di+dirFat.filename+2],   0x2020   ; Pad filename and ext with spaces
-    mov word [di+dirFat.filename+4],   0x2020
-    mov word [di+dirFat.filename+6],   0x2020
-    mov word [di+dirFat.filename+8],   0x2020
-    mov byte [di+dirFat.filename+10],  0x20
-    mov byte [di+dirFat.attributes],   0x10     ; File attribtutes
-    mov byte [di+dirFat.reserved],     0        ; Reserved for Windows NT usage
-    mov byte [di+dirFat.idk],          0x4c     ; 10-millisecond units past creation time below
-    mov word [di+dirFat.creationTime], 0x6996   ; Time of the file created
-    mov word [di+dirFat.creationDate], 0x5036   ; Date of the file created
-    mov word [di+dirFat.accessedDate], 0x5036   ; Date of last access to the file
-    mov word [di+dirFat.clusterHi],    0        ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+dirFat.modifiedTime], 0x6997   ; Time of the file last modified
-    mov word [di+dirFat.modifiedDate], 0x5036   ; Date of the file last modified
-    mov word [di+dirFat.clusterLo],    cx       ; Low starting cluster
-    mov word [di+dirFat.filesize],     0        ; Size of the file
-    mov word [di+dirFat.filesize+2],   0        ; 
+    mov word [di+FAT_DIR_FILENAME],      '..'
+    mov word [di+FAT_DIR_FILENAME+2],    0x2020 ; Pad filename and ext with spaces
+    mov word [di+FAT_DIR_FILENAME+4],    0x2020
+    mov word [di+FAT_DIR_FILENAME+6],    0x2020
+    mov word [di+FAT_DIR_FILENAME+8],    0x2020
+    mov byte [di+FAT_DIR_FILENAME+10],   0x20
+    mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
+    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    cx     ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
 
     sub di, 32
     call writeClusters                          ; Now write the two dir entrys to the disk
@@ -1327,18 +1326,18 @@ createDir:
 
     sub di, 11
 
-    mov byte [di+dirFat.attributes],   0x10     ; File attribtutes
-    mov byte [di+dirFat.reserved],     0        ; Reserved for Windows NT usage
-    mov byte [di+dirFat.idk],          0x4c     ; 10-millisecond units past creation time below
-    mov word [di+dirFat.creationTime], 0x6996   ; Time of the file created
-    mov word [di+dirFat.creationDate], 0x5036   ; Date of the file created
-    mov word [di+dirFat.accessedDate], 0x5036   ; Date of last access to the file
-    mov word [di+dirFat.clusterHi],    0        ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+dirFat.modifiedTime], 0x6997   ; Time of the file last modified
-    mov word [di+dirFat.modifiedDate], 0x5036   ; Date of the file last modified
-    mov word [di+dirFat.clusterLo],    cx       ; Low starting cluster
-    mov word [di+dirFat.filesize],     0        ; Size of the file
-    mov word [di+dirFat.filesize+2],   0        ; 
+    mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
+    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    cx     ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
 
     mov es, bx
     mov di, dx
@@ -1418,8 +1417,8 @@ removeDir:
     call searchDir
     jc .fileNotFound
 
-    mov cx, word [es:di+dirFat.clusterLo]       ; Get the file cluster
-    mov al, byte [es:di+dirFat.attributes]      ; Get the file atribute byte
+    mov cx, word [es:di+FAT_DIR_CLUSTER_LO]     ; Get the file cluster
+    mov al, byte [es:di+FAT_DIR_ATTRIBUTES]     ; Get the file atribute byte
 
     cmp al, 0x10                                ; Check to see if its a directory
     jne .notDir
@@ -1503,11 +1502,11 @@ fileSize:
     call searchDir
     jc .fileNotFound
 
-    cmp word [di+dirFat.attributes], 0x10       ; Check to see if its a directory
+    cmp word [di+FAT_DIR_ATTRIBUTES], 0x10      ; Check to see if its a directory
     je .fileNotFound
 
-    mov dx, word [di+dirFat.filesize]           ; Get the size of the file
-    mov ax, word [di+dirFat.filesize+2]
+    mov dx, word [di+FAT_DIR_FILESIZE]          ; Get the size of the file
+    mov ax, word [di+FAT_DIR_FILESIZE+2]
 
     call unloadCwd                              ; Free the dir from memory
 
@@ -1678,18 +1677,18 @@ createFile:
 
     sub di, 11                                  ; 
 
-    mov byte [di+dirFat.attributes],   0        ; File attribtutes
-    mov byte [di+dirFat.reserved],     0        ; Reserved for Windows NT usage
-    mov byte [di+dirFat.idk],          0        ; 10-millisecond units past creation time below
-    mov word [di+dirFat.creationTime], 0xc67e   ; Time of the file created
-    mov word [di+dirFat.creationDate], 0        ; Date of the file created
-    mov word [di+dirFat.accessedDate], 0        ; Date of last access to the file
-    mov word [di+dirFat.clusterHi],    0        ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+dirFat.modifiedTime], 0xc67e   ; Time of the file last modified
-    mov word [di+dirFat.modifiedDate], 0        ; Date of the file last modified
-    mov word [di+dirFat.clusterLo],    0        ; Low starting cluster
-    mov word [di+dirFat.filesize],     0        ; Size of the file
-    mov word [di+dirFat.filesize+2],   0        ; 
+    mov byte [di+FAT_DIR_ATTRIBUTES],    0      ; File attribtutes
+    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0      ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], 0xc67e ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], 0      ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], 0      ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], 0xc67e ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], 0      ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    0      ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
 
     mov es, bx
     mov di, dx
@@ -1860,8 +1859,8 @@ deleteFile:
     jc .fileNotFound
 
     mov byte [es:di], 0xe5                      ; Mark file entry as deleted
-    mov ax, word [di+dirFat.filesize]           ; Size in bytes of the file
-    mov cx, word [di+dirFat.clusterLo]          ; File cluster number
+    mov ax, word [di+FAT_DIR_FILESIZE]          ; Size in bytes of the file
+    mov cx, word [di+FAT_DIR_CLUSTER_LO]        ; File cluster number
 
     mov es, bx
     mov di, dx
@@ -1964,9 +1963,9 @@ readFile:
     call searchDir
     jc .fileNotFound
 
-    mov ax, word [es:di+dirFat.clusterLo]       ; File cluster number
-    mov cx, word [es:di+dirFat.filesize]        ; Get the size of the file
-    mov dx, word [es:di+dirFat.filesize+2]
+    mov ax, word [es:di+FAT_DIR_CLUSTER_LO]     ; File cluster number
+    mov cx, word [es:di+FAT_DIR_FILESIZE]       ; Get the size of the file
+    mov dx, word [es:di+FAT_DIR_FILESIZE+2]
 
     call unloadCwd                              ; Free the dir from memory
 
@@ -2082,9 +2081,9 @@ writeFile:
     mov dx, word [.hiFilesize]
 
     xchg ax, dx
-    mov word [di+dirFat.clusterLo], cx
-    mov word [di+dirFat.filesize], ax
-    mov word [di+dirFat.filesize+2], dx
+    mov word [di+FAT_DIR_CLUSTER_LO], cx
+    mov word [di+FAT_DIR_FILESIZE], ax
+    mov word [di+FAT_DIR_FILESIZE+2], dx
     pop dx
 
     mov es, bx

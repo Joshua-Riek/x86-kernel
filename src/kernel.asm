@@ -108,7 +108,7 @@ _start:
 ; Included files
 ;---------------------------------------------------
 
-%include "src/_succ.inc"
+%include "src/fat.asm"
 %include "src/keyboard.asm"
 %include "src/string.asm"
 %include "src/memory.asm"
@@ -118,7 +118,6 @@ _start:
 %include "src/disk.asm"
 %include "src/test.asm"
 %include "src/math.asm"
-%include "src/fat.asm"
 %include "src/cli.asm"
 %include "src/dos.asm"
 
@@ -130,7 +129,7 @@ _start:
 ; Main kernel varables below
 ;---------------------------------------------------
 
-__CURRENT_BUILD db "SuccOS kernel ", __SUCC_VERSION," [compiled on ", __DATE__, "]", 10, 13, 10, 13, 0
+__CURRENT_BUILD db "x86 kernel 1.5.1 [compiled on ", __DATE__, "]", 10, 13, 10, 13, 0
 
 __GPL_NOTICE    db "Copyright (c) 2017-2022 Joshua Riek", 10, 13,
                 db "This program comes with ABSOLUTELY NO WARRANTY; for details", 10, 13
