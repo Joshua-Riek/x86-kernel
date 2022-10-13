@@ -1237,10 +1237,20 @@ createDir:
     mov dx, cs
     mov ds, dx                                  ; Now we refrence .tmpName through ds
 
+    call fatFmtTimeAndDate
+    mov word [.time], ax
+    mov word [.date], dx
+
     mov ax, 0x0000
     mov dx, 0x0200
     call memAllocBytes
     jc .memoryError
+
+    push ax
+    push dx
+
+    mov ax, word [.time]
+    mov dx, word [.date]
 
     mov byte [di+FAT_DIR_FILENAME],      '.'
     mov word [di+FAT_DIR_FILENAME+1],    0x2020 ; Pad filename and ext with spaces
@@ -1249,17 +1259,17 @@ createDir:
     mov word [di+FAT_DIR_FILENAME+7],    0x2020
     mov word [di+FAT_DIR_FILENAME+9],    0x2020
     mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
-    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
-    mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
-    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
-    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
-    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
-    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
-    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
-    mov word [di+FAT_DIR_CLUSTER_LO],    0      ; Low starting cluster
-    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
-    mov word [di+FAT_DIR_FILESIZE+2],    0      ;
+    mov byte [di+FAT_DIR_RESERVED],      0x00   ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0x00   ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], ax     ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], dx     ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], dx     ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0x0000 ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], ax     ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], dx     ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    0x0000 ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0x0000 ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0x0000 ;
 
     add di, 32
     mov cx, word [cwdCluster]
@@ -1271,17 +1281,20 @@ createDir:
     mov word [di+FAT_DIR_FILENAME+8],    0x2020
     mov byte [di+FAT_DIR_FILENAME+10],   0x20
     mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
-    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_RESERVED],      0x00   ; Reserved for Windows NT usage
     mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
-    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
-    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
-    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
-    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
-    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
+    mov word [di+FAT_DIR_CREATION_TIME], ax     ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], dx     ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], dx     ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0x0000 ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], ax     ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], dx     ; Date of the file last modified
     mov word [di+FAT_DIR_CLUSTER_LO],    cx     ; Low starting cluster
-    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
-    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
+    mov word [di+FAT_DIR_FILESIZE],      0x0000 ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0x0000 ; 
+
+    pop dx
+    pop ax
 
     sub di, 32
     call writeClusters                          ; Now write the two dir entrys to the disk
@@ -1326,18 +1339,27 @@ createDir:
 
     sub di, 11
 
+    push ax
+    push dx
+
+    mov ax, word [.time]
+    mov dx, word [.date]
+
     mov byte [di+FAT_DIR_ATTRIBUTES],    0x10   ; File attribtutes
-    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_RESERVED],      0x00   ; Reserved for Windows NT usage
     mov byte [di+FAT_DIR_CREATION_MS],   0x4c   ; 10-millisecond units past creation time below
-    mov word [di+FAT_DIR_CREATION_TIME], 0x6996 ; Time of the file created
-    mov word [di+FAT_DIR_CREATION_DATE], 0x5036 ; Date of the file created
-    mov word [di+FAT_DIR_ACCESSED_DATE], 0x5036 ; Date of last access to the file
-    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+FAT_DIR_MODIFIED_TIME], 0x6997 ; Time of the file last modified
-    mov word [di+FAT_DIR_MODIFIED_DATE], 0x5036 ; Date of the file last modified
+    mov word [di+FAT_DIR_CREATION_TIME], ax     ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], dx     ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], dx     ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0x0000 ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], ax     ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], dx     ; Date of the file last modified
     mov word [di+FAT_DIR_CLUSTER_LO],    cx     ; Low starting cluster
-    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
-    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
+    mov word [di+FAT_DIR_FILESIZE],      0x0000 ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0x0000 ; 
+
+    pop dx
+    pop ax
 
     mov es, bx
     mov di, dx
@@ -1377,6 +1399,8 @@ createDir:
     stc                                         ; Set carry, error occured
     ret
 
+  .date dw 0
+  .time dw 0
   .tmpName times 12 db 0x00
 
 ;--------------------------------------------------  
@@ -1675,20 +1699,28 @@ createFile:
     mov cx, 11                                  ; Length of filename
     rep movsb                                   ; Copy bytes from ds:si to es:di 
 
-    sub di, 11                                  ; 
+    sub di, 11
 
-    mov byte [di+FAT_DIR_ATTRIBUTES],    0      ; File attribtutes
-    mov byte [di+FAT_DIR_RESERVED],      0      ; Reserved for Windows NT usage
-    mov byte [di+FAT_DIR_CREATION_MS],   0      ; 10-millisecond units past creation time below
-    mov word [di+FAT_DIR_CREATION_TIME], 0xc67e ; Time of the file created
-    mov word [di+FAT_DIR_CREATION_DATE], 0      ; Date of the file created
-    mov word [di+FAT_DIR_ACCESSED_DATE], 0      ; Date of last access to the file
-    mov word [di+FAT_DIR_CLUSTER_HI],    0      ; High starting cluster for file (alwase zero for fat16 and fat12)
-    mov word [di+FAT_DIR_MODIFIED_TIME], 0xc67e ; Time of the file last modified
-    mov word [di+FAT_DIR_MODIFIED_DATE], 0      ; Date of the file last modified
-    mov word [di+FAT_DIR_CLUSTER_LO],    0      ; Low starting cluster
-    mov word [di+FAT_DIR_FILESIZE],      0      ; Size of the file
-    mov word [di+FAT_DIR_FILESIZE+2],    0      ; 
+    push ax
+    push dx
+
+    call fatFmtTimeAndDate
+
+    mov byte [di+FAT_DIR_ATTRIBUTES],    0x00   ; File attribtutes
+    mov byte [di+FAT_DIR_RESERVED],      0x00   ; Reserved for Windows NT usage
+    mov byte [di+FAT_DIR_CREATION_MS],   0x00   ; 10-millisecond units past creation time below
+    mov word [di+FAT_DIR_CREATION_TIME], ax     ; Time of the file created
+    mov word [di+FAT_DIR_CREATION_DATE], dx     ; Date of the file created
+    mov word [di+FAT_DIR_ACCESSED_DATE], dx     ; Date of last access to the file
+    mov word [di+FAT_DIR_CLUSTER_HI],    0x0000 ; High starting cluster for file (alwase zero for fat16 and fat12)
+    mov word [di+FAT_DIR_MODIFIED_TIME], ax     ; Time of the file last modified
+    mov word [di+FAT_DIR_MODIFIED_DATE], dx     ; Date of the file last modified
+    mov word [di+FAT_DIR_CLUSTER_LO],    0x0000 ; Low starting cluster
+    mov word [di+FAT_DIR_FILESIZE],      0x0000 ; Size of the file
+    mov word [di+FAT_DIR_FILESIZE+2],    0x0000 ; 
+
+    pop dx
+    pop ax
 
     mov es, bx
     mov di, dx

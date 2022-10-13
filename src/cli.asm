@@ -696,7 +696,7 @@ doType:
     pop dx
 
   .nextByte:
-dec cx
+    dec cx
     
     cmp cx, 0                                   ; Decrease counter and see if we are at the end
     jne .readBytes
@@ -873,37 +873,42 @@ doTime:
     mov si, currentTime
     call videoWriteStr
 
-    mov ah, 0x02                                ; Read RTC time
-    int 0x1a                                    ; System and RTC BIOS services
-
-    mov al, ch                                  ; Hours in BCD
-    call bcd                                    ; Convert BCD
-    mov ch, al
-
-    mov al, cl                                  ; Minutes in BCD
-    call bcd                                    ; Convert BCD
-    mov cl, al
-
-    mov al, dh                                  ; Seconds in BCD
-    call bcd                                    ; Convert BCD
-    mov dh, al
+    call cmosReadTime
 
     mov bx, 10                                  ; Base 10 number
     xor ah, ah
     mov al, ch                                  ; Hours
+    cmp ax, 12                                  ; Convert 24 hour time to 12 hour time
+    jg .pm
+
+  .am:
+    cmp ax, 0                                   ; Must fix value if zero
+    jne .fixa
+    add ax, 12                                  ; Fix value so it's 12:00a and not 0:00a
+
+  .fixa:
+    mov dx, 'a'                                 ; Put the 'a' for am into bx
+    jmp .hour
+
+  .pm:
+    sub ax, 12                                  ; Correct the value for pm
+    mov dx, 'p'                                 ; Put the 'p' for pm into bx
+
+  .hour:
+    push dx
+
     call videoWriteNum                          ; Write as a number
 
     mov al, ':'
     call videoWriteChar
 
     mov al, cl                                  ; Minutes
-    call videoWriteNum                          ; Write as a number
+    mov ch, 2                                   ; Pad length
+    mov cl, '0'                                 ; Pad with zeros
+    call videoWriteNumPadding                   ; Write as a number
 
-    mov al, ':'
+    pop ax
     call videoWriteChar
-
-    mov al, dh                                  ; Seconds
-    call videoWriteNum                          ; Write as a number
 
     jmp cliLoop
 
@@ -920,24 +925,7 @@ doDate:
     mov si, currentDate
     call videoWriteStr
 
-    mov ah, 0x04                                ; Read RTC date
-    int 0x1a                                    ; System and RTC BIOS services
-
-    mov al, ch                                  ; Century in BCD
-    call bcd                                    ; Convert BCD
-    mov ch, al
-
-    mov al, cl                                  ; Year in BCD
-    call bcd                                    ; Convert BCD
-    mov cl, al
-
-    mov al, dh                                  ; Month in BCD
-    call bcd                                    ; Convert BCD
-    mov dh, al
-
-    mov al, dl                                  ; Day in BCD
-    call bcd                                    ; Convert BCD
-    mov dl, al
+    call cmosReadDate
 
     mov bx, 10                                  ; Base 10 number
     xor ah, ah
@@ -953,12 +941,9 @@ doDate:
     mov al, '-'
     call videoWriteChar
 
-    mov al, ch                                  ; Century
-    call videoWriteNum                          ; Write as a number
-
-    mov al, cl                                  ; Year
+    mov ax, cx                                  ; Year
     mov cl, '0'                                 ; Write as a padded number
-    mov ch, 2
+    mov ch, 4
     call videoWriteNumPadding
 
     jmp cliLoop

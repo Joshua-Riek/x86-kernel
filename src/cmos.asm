@@ -60,7 +60,7 @@ cmosRead:
 ;
 ;---------------------------------------------------
     push bx
-    mov al, bl
+    mov bl, al
 
     cli                                         ; Disable interrupts
     or al, NMI_DISABLE_BIT << 7                 ; Disable NMI
@@ -260,4 +260,3 @@ bcd:
     pop dx                                      ; Restore registers
     pop bx
     ret
-

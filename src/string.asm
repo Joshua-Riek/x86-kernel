@@ -685,12 +685,12 @@ strCmp:
   .cmp:
     mov al, byte [ds:si]                        ; Byte from si
     mov bl, byte [es:di]                        ; Byte from di
-    cmp al, bl					                ; Are both bytes equal?
-    jne .nequal					                ; If not, we are finished
-    cmp al, 0	                                ; If string is empty, we are finished
+    cmp al, bl					                        ; Are both bytes equal?
+    jne .nequal					                        ; If not, we are finished
+    cmp al, 0	                                  ; If string is empty, we are finished
     je .equal
-    inc di					                    ; Point to next char
-    inc si					                    ; Point to next char
+    inc di					                            ; Point to next char
+    inc si					                            ; Point to next char
     jmp .cmp
 
   .nequal:

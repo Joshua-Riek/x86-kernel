@@ -1437,3 +1437,83 @@ writeClusters:
     pop ax
 
     ret
+
+;--------------------------------------------------  
+fatFmtTimeAndDate:
+;
+; Get the time and date in fat format.
+;
+; Expects: Nothing
+;
+; Returns: AX    = Time
+; Returns: DX    = Date
+;
+;--------------------------------------------------  
+    push bx                                     ; Save registers
+    push cx
+
+    call cmosReadTime
+
+    mov al, ch
+    and ax, 0000000000011111b                   ; Mask 5 bits for the hour
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+
+    mov bl, cl
+    and bx, 0000000000111111b                   ; Mask 6 bits for the minute
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    or ax, bx
+
+    mov bl, dh
+    and bx, 0000000000011111b                   ; Mask 5 bits for the second
+    or ax, bx
+    push ax
+
+    call cmosReadDate   
+
+    mov ax, cx
+    sub ax , 1980
+    and ax, 0000000001111111b                   ; Mask 7 bits for the year
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+    shl ax, 1
+
+    mov bl, dh
+    and bx, 0000000000001111b                   ; Mask 4 bits for the month
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    shl bx, 1
+    or ax, bx
+
+    mov bl, dl
+    and bx, 0000000000011111b                   ; Mask 5 bits for the day
+    or ax, bx
+
+    pop dx
+    xchg ax, dx
+
+    pop cx                                      ; Restore registers
+    pop bx
+
+    ret
