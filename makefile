@@ -56,11 +56,11 @@ INCLUDES = $(SRCDIR)/cli.asm \
 
 
 # Set phony targets
-.PHONY: all clean clobber kernel install boot12 boot16 debug run
+.PHONY: all clean clobber kernel images boot12 boot16 debug run
 
 
 # Rule to make targets
-all: kernel install
+all: kernel boot12 boot16 images
 
 
 # Makefile target for the kernel
@@ -103,7 +103,7 @@ $(OBJDIR)/boot16.o: $(SRCDIR)/boot16.asm | $(OBJDIR)
 
 
 # Makefile target to create both disk images
-install: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
+images: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
 
 $(BINDIR)/boot12.img: $(BINDIR)/boot12.bin $(BINDIR)/kernel.bin
 	dd if=/dev/zero of=$@ bs=1024 count=1440 status=none
