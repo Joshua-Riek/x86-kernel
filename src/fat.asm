@@ -746,7 +746,7 @@ writeClustersFAT12:
     pop word [.loadSEG]
 
     mov si, .freeClusters
-    mov cx, 512
+    mov cx, 2048
 
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
@@ -1059,7 +1059,7 @@ writeClustersFAT12:
   .loadSEG dw 0
   .loadOFF dw 0
   .clustersNeeded dw 0
-  .freeClusters times 512 dw 0
+  .freeClusters times 2048 dw 0
 
 ;--------------------------------------------------
 writeClustersFAT16:
@@ -1094,7 +1094,7 @@ writeClustersFAT16:
     pop word [.loadSEG]
 
     mov si, .freeClusters                       ; TODO: dynamic allocation for free cluster list
-    mov cx, 512
+    mov cx, 2048
 
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
@@ -1354,7 +1354,7 @@ writeClustersFAT16:
   .loadSEG dw 0
   .loadOFF dw 0
   .clustersNeeded dw 0
-  .freeClusters times 512 dw 0
+  .freeClusters times 2048 dw 0
 
 ;--------------------------------------------------
 writeClusters:   

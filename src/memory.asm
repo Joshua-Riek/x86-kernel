@@ -419,7 +419,7 @@ memAllocBytes:
     push bx
     push dx
 
-    add dx, 0x200                               ; Add 512 bytes to the block
+    add dx, 0x400                               ; Add 1024 bytes to the block
 
     call memBytesToBlocks32
     cmp bx, 0
@@ -559,7 +559,7 @@ memFreeBytes:
 
     ;call logFreeMem
 
-    add dx, 0x200                               ; Add 512 bytes to the block
+    add dx, 0x400                               ; Add 1024 bytes to the block
 
     call memBytesToBlocks32
     cmp bx, 0
