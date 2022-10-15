@@ -419,8 +419,6 @@ memAllocBytes:
     push bx
     push dx
 
-    add dx, 0x400                               ; Add 1024 bytes to the block
-
     call memBytesToBlocks32
     cmp bx, 0
     jz .done
@@ -558,8 +556,6 @@ memFreeBytes:
     push dx
 
     ;call logFreeMem
-
-    add dx, 0x400                               ; Add 1024 bytes to the block
 
     call memBytesToBlocks32
     cmp bx, 0

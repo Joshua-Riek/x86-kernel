@@ -785,6 +785,9 @@ doCopy:
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
 
+    clc
+    add dx, 0x2000
+    adc ax, 0
     call memAllocBytes                          ; Allocate space for the file 
     jc .memError
 
@@ -795,6 +798,9 @@ doCopy:
     call writeFile                              ; Finally write data into a new file
     jc .writeFailure
 
+    clc
+    add dx, 0x2000
+    adc ax, 0
     call memFreeBytes                           ; Free up the memory
 
     pop ds                                      ; Restore registers

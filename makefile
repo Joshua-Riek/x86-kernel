@@ -56,11 +56,11 @@ INCLUDES = $(SRCDIR)/cli.asm \
 
 
 # Set phony targets
-.PHONY: all clean clobber kernel images boot12 boot16 debug run
+.PHONY: all clean clobber kernel bootloader image debug run
 
 
 # Rule to make targets
-all: kernel boot12 boot16 images
+all: kernel bootloader image
 
 
 # Makefile target for the kernel
@@ -76,8 +76,8 @@ $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm $(INCLUDES) | $(OBJDIR)
 	$(NASM) $< -O0 $(NASMFLAGS) -o $@
 
 
-# Makefile target for the FAT12 bootloader
-boot12: $(BINDIR)/boot12.bin
+# Makefile target for both bootloaders
+bootloader: $(BINDIR)/boot12.bin $(BINDIR)/boot16.bin
 
 $(BINDIR)/boot12.bin: $(BINDIR)/boot12.elf
 	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
@@ -87,10 +87,6 @@ $(BINDIR)/boot12.elf: $(OBJDIR)/boot12.o | $(BINDIR)
 
 $(OBJDIR)/boot12.o: $(SRCDIR)/boot12.asm | $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
-
-
-# Makefile target for the FAT16 bootloader
-boot16: $(BINDIR)/boot16.bin
 
 $(BINDIR)/boot16.bin: $(BINDIR)/boot16.elf
 	$(OBJCOPY) $^ $(OBJCOPYFLAGS) $@
@@ -103,7 +99,7 @@ $(OBJDIR)/boot16.o: $(SRCDIR)/boot16.asm | $(OBJDIR)
 
 
 # Makefile target to create both disk images
-images: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
+image: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
 
 $(BINDIR)/boot12.img: $(BINDIR)/boot12.bin $(BINDIR)/kernel.bin
 	dd if=/dev/zero of=$@ bs=1024 count=1440 status=none
@@ -136,11 +132,17 @@ clobber: clean
 	rm -f $(SRCDIR)/*~ $(SRCDIR)\#*\# ./*~
 
 
-# Run the disk image
-run:
-	$(QEMU) -serial stdio -rtc base=localtime -fda bin/boot12.img
+# Makefile target to run or debug both disk images
+ifeq ($(FS), FAT16)
+run: image
+	$(QEMU) -serial stdio -rtc base=localtime -drive file=bin/boot16.img,format=raw
 
-# Start a debug session with qemu
-debug:
-	$(QEMU) -serial stdio -rtc base=localtime -S -s -fda bin/boot12.img
+debug: image
+	$(QEMU) -serial stdio -rtc base=localtime -S -s -drive file=bin/boot16.img,format=raw
+else
+run: image
+	$(QEMU) -serial stdio -rtc base=localtime -drive file=bin/boot12.img,format=raw,if=floppy
 
+debug: image
+	$(QEMU) -serial stdio -rtc base=localtime -S -s -drive file=bin/boot12.img,format=raw,if=floppy
+endif
