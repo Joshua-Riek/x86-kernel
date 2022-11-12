@@ -20,9 +20,8 @@
 CC           := i686-elf-gcc
 LD           := i686-elf-ld
 AR           := i686-elf-ar
-NASM         ?= nasm
-OBJCOPY      ?= objcopy
-DD           ?= dd
+NASM         := nasm
+OBJCOPY      := objcopy
 
 # Other tools
 QEMU         ?= qemu-system-i386
@@ -64,6 +63,12 @@ all: kernel bootloader image
 
 
 # Makefile target for the kernel
+ifeq (, $(shell which $(LD)))
+kernel: $(BINDIR)/kernel.bin
+
+$(BINDIR)/kernel.bin: $(SRCDIR)/kernel.asm | $(BINDIR)
+	$(NASM) $^ -f bin -o $@
+else
 kernel: $(BINDIR)/kernel.bin
 
 $(BINDIR)/kernel.bin: $(BINDIR)/kernel.elf
@@ -74,9 +79,18 @@ $(BINDIR)/kernel.elf: $(OBJDIR)/kernel.o | $(BINDIR)
 
 $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm $(INCLUDES) | $(OBJDIR)
 	$(NASM) $< -O0 $(NASMFLAGS) -o $@
-
+endif
 
 # Makefile target for both bootloaders
+ifeq (, $(shell which $(LD)))
+bootloader: $(BINDIR)/boot12.bin $(BINDIR)/boot16.bin
+
+$(BINDIR)/boot12.bin: $(SRCDIR)/boot12.asm | $(BINDIR)
+	$(NASM) $^ -f bin -o $@
+
+$(BINDIR)/boot16.bin: $(SRCDIR)/boot16.asm | $(BINDIR)
+	$(NASM) $^ -f bin -o $@
+else
 bootloader: $(BINDIR)/boot12.bin $(BINDIR)/boot16.bin
 
 $(BINDIR)/boot12.bin: $(BINDIR)/boot12.elf
@@ -96,7 +110,7 @@ $(BINDIR)/boot16.elf: $(OBJDIR)/boot16.o | $(BINDIR)
 
 $(OBJDIR)/boot16.o: $(SRCDIR)/boot16.asm | $(OBJDIR)
 	$(NASM) $^ $(NASMFLAGS) -o $@
-
+endif
 
 # Makefile target to create both disk images
 image: $(BINDIR)/boot12.img $(BINDIR)/boot16.img
