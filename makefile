@@ -60,7 +60,7 @@ all: kernel bootloader image
 
 
 # Makefile target for the kernel
-ifeq (, $(shell which $(LD)))
+ifeq ($(and $(shell which $(LD)),$(shell which $(OBJCOPY))),)
 kernel: $(BINDIR)/kernel.bin
 
 $(BINDIR)/kernel.bin: $(SRCDIR)/kernel.asm | $(BINDIR)
