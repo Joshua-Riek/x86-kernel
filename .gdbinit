@@ -25,6 +25,7 @@ target remote localhost:1234
 set confirm off
 set verbose off
 set prompt \033[31mgdb$ \033[0m
+set pagination off
 
 set output-radix 0d10
 set input-radix 0d10
