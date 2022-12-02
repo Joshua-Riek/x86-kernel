@@ -436,7 +436,7 @@ memAllocBytes:
     pop cx
     
   .done:
-    ;call logAllocMem
+    call logAllocMem
   
     clc                                         ; No error, so clear carry
     ret
@@ -555,7 +555,7 @@ memFreeBytes:
     push ax                                     ; Save registers
     push dx
 
-    ;call logFreeMem
+    call logFreeMem
 
     call memBytesToBlocks32
     cmp bx, 0
@@ -592,7 +592,7 @@ allocMemAddress:
     push es
     push ds
 
-    ;call logAllocMem
+    call logAllocMem
 
     call memAddressToBlock                      ; Convert address to block/ index
     call memBytesToBlocks32                     ; Convert size in bytes to size in blocks
@@ -738,18 +738,21 @@ logAllocMem:
 ; Returns: None
 ;
 ;---------------------------------------------------
+%ifdef DEBUG
     push si
 
     mov si, .allocrStr
     call serialWriteStr
     
     call logPrint
-    
     pop si
     ret
 
   .allocrStr db "[+] Allocated address:   0x", 0
-    
+%else
+    ret
+%endif
+
 ;---------------------------------------------------
 logFreeMem:
 ;
@@ -761,6 +764,7 @@ logFreeMem:
 ; Returns: None
 ;
 ;---------------------------------------------------
+%ifdef DEBUG
     push si
     
     mov si, .unAllocStr
@@ -771,6 +775,9 @@ logFreeMem:
     ret
     
   .unAllocStr  db "[-] Unallocated address: 0x", 0
+%else
+    ret
+%endif
 
 ;---------------------------------------------------
 logPrint:
@@ -783,6 +790,7 @@ logPrint:
 ; Returns: None
 ;
 ;---------------------------------------------------
+%ifdef DEBUG
     push ax                                     ; Save registers
     push bx
     push cx
@@ -836,4 +844,6 @@ logPrint:
     ret
 
   .lenStr db " => Size in Bytes: ", 0
- 
+%else
+    ret
+%endif

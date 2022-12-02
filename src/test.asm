@@ -16,8 +16,6 @@
 ;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;
 
-%ifdef DEBUG
-
 %macro writeFileMacro 2+
     jmp %%endstr2
   %%str1:
@@ -60,7 +58,17 @@
     call changeDir
 %endmacro
 
+;---------------------------------------------------
 fileTesting:
+;
+; Testing for file i/o operations.
+;
+; Expects: None
+;
+; Returns: None
+;
+;---------------------------------------------------
+%ifdef DEBUG
     push ax
     push bx
     push cx
@@ -148,5 +156,5 @@ fileTesting:
     pop cx
     pop bx
     pop ax
-    ret
 %endif
+    ret

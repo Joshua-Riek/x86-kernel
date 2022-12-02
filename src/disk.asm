@@ -145,6 +145,8 @@ setupDisk:
     mul bx
     mov word [cs:bytesPerCluster], ax
 
+    call logBpb
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -2172,4 +2174,333 @@ writeFile:
   .loFilesize dw 0
   .hiFilesize dw 0
   .tmpName times 12 db 0x00
+
+;---------------------------------------------------
+logBpb:
+;
+; Log bpb information to the serial port.
+;
+; Expects: None
+;
+; Returns: None
+;
+;---------------------------------------------------
+%ifdef DEBUG
+    push ax                                     ; Save registers
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+    push es
+    push ds
+
+    push cs
+    pop ds
+
+    mov si, .str0
+    call serialWriteStr
+
+    mov si, .str1
+    call serialWriteStr
+
+    mov cx, 3
+    mov si, bootJump
+
+  .loop1:
+    lodsb
+    mov ah, 0
+    mov bx, 16
+    call serialWriteNum
+    loop .loop1
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str2
+    call serialWriteStr
+
+    mov cx, 8
+    mov si, OEMName
+
+  .loop2:
+    lodsb
+    call serialWrite
+    loop .loop2
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str3
+    call serialWriteStr
+
+    mov ax, [bytesPerSector]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str4
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [sectorsPerCluster]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str5
+    call serialWriteStr
+
+    mov ax, word [reservedSectors]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str6
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [fats]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str7
+    call serialWriteStr
+
+    mov ax, word [rootDirEntries]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str8
+    call serialWriteStr
+
+    mov ax, word [sectors]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str9
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [mediaType]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str10
+    call serialWriteStr
+
+    mov ax, word [fatSectors]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str11
+    call serialWriteStr
+
+    mov ax, word [sectorsPerTrack]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str12
+    call serialWriteStr
+
+    mov ax, word [heads]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str13
+    call serialWriteStr
+
+    mov ax, word [hiddenSectors+2]
+    mov dx, word [hiddenSectors]
+    mov bx, 16
+    call serialWriteNum32
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str14
+    call serialWriteStr
+
+    mov ax, word [hugeSectors+2]
+    mov dx, word [hugeSectors]
+    mov bx, 16
+    call serialWriteNum32
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str15
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [driveNum]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str16
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [reserved]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str17
+    call serialWriteStr
+
+    xor ah, ah
+    mov al, byte [bootSignature]
+    mov bx, 16
+    call serialWriteNum
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str18
+    call serialWriteStr
+
+    mov ax, word [volumeId+2]
+    mov dx, word [volumeId]
+    mov bx, 16
+    call serialWriteNum32
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str19
+    call serialWriteStr
+
+    mov cx, 11
+    mov si, volumeLabel
+
+  .loop3:
+    lodsb
+    call serialWrite
+    loop .loop3
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    mov si, .str20
+    call serialWriteStr
+
+    mov cx, 8
+    mov si, fatTypeLabel
+
+  .loop4:
+    lodsb
+    call serialWrite
+    loop .loop4
+
+    mov al, 13
+    call serialWrite
+    mov al, 10
+    call serialWrite
+
+    pop ds                                      ; Restore registers
+    pop es
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+
+    ret
+
+  .str0 db "BPB (BIOS Parameter Block)", 10, 13, 0
+  .str1 db "bootJump:          0x", 0
+  .str2 db "OEMName:           ", 0
+  .str3 db "bytesPerSector:    0x", 0
+  .str4 db "sectorsPerCluster: 0x", 0
+  .str5 db "reservedSectors:   0x", 0
+  .str6 db "fats:              0x", 0
+  .str7 db "rootDirEntries:    0x", 0
+  .str8 db "sectors:           0x", 0
+  .str9 db "mediaType:         0x", 0
+  .str10 db "fatSectors:        0x", 0
+  .str11 db "sectorsPerTrack:   0x", 0
+  .str12 db "heads:             0x", 0
+  .str13 db "hiddenSectors:     0x", 0
+  .str14 db "hugeSectors:       0x", 0
+  .str15 db "driveNum:          0x", 0
+  .str16 db "reserved:          0x", 0
+  .str17 db "bootSignature:     0x", 0
+  .str18 db "volumeId:          0x", 0
+  .str19 db "volumeLabel:       ", 0
+  .str20 db "fatTypeLabel:      ", 0
+%else
+    ret
+%endif
 
