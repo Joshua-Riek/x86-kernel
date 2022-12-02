@@ -2079,18 +2079,22 @@ writeFile:
     mov cx, cs
     mov ds, cx                                  ; Now we refrence .tmpName through ds
 
-    ;pop word [.loadOFF]
-    ;pop word [.loadSEG]
     mov word [.loFilesize], ax                  ; Save the lo word of the filesize
     mov word [.hiFilesize], dx                  ; Save the hi word of the filesize
 
-    ;mov si, .tmpName
-    ;call fileExists                            ; Do not overwrite a file if it exists!
-    ;jnc .fileExists
-
     mov si, .tmpName 
-    call createFile                             ; Create the file to write
-    ;jc .createFileError
+    call createFile                             ; Create the file entry
+    jc .createFileError
+
+    test ax, ax                                 ; Check to see if the file is empty
+    jnz .fileExists
+    test dx, dx
+    jnz .fileExists
+
+    pop di
+    pop es
+
+    jmp .fileZero
 
   .fileExists:
     pop di
@@ -2098,8 +2102,7 @@ writeFile:
     mov ax, word [.loFilesize]
     mov dx, word [.hiFilesize]
     call writeClusters
-    ;; CALL NEW FUNC HERE
-    
+
     call loadCwd                                ; Allocate and read the dir
     jc .loadDirError
     
@@ -2110,7 +2113,6 @@ writeFile:
     call searchDir
 
     push dx
-    ;mov cx, word [.freeClusters]
     mov ax, word [.loFilesize]
     mov dx, word [.hiFilesize]
 
@@ -2141,24 +2143,15 @@ writeFile:
     clc                                         ; Clear carry, for no error
     ret
 
-  .writeFatError:                               ; Error, unable to write the new fat to the disk
-    call unloadFat                              ; But was able to create a newfile entry
-    jmp .error
-
-  .writeSectorsError:                           ; Was able to write FAT and a newfile entry
-    pop cx                                      ; But, error on writing clusters to disk
-    pop ax
-    jmp .error
-
   .writeDirError:
     call unloadCwd                              ; Free the dir from memory
+    jmp .loadDirError
 
-  .fileExistsError:
   .createFileError:
-  .loadFatError:
-  .loadDirError: 
+    pop di
+    pop es
 
-  .error:
+  .loadDirError: 
     pop ds                                      ; Restore registers
     pop es
     pop di
