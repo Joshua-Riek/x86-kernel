@@ -801,7 +801,6 @@ kbdBiosGetChar:
     push ds
     push bx
     push dx
-    cli                                         ; Clear interupts while changing things in the bios data area
 
     xor dx, dx                                  ; Clear for divison
     xor ax, ax                                  ; Ensure ax is clear for the return value
@@ -825,8 +824,8 @@ kbdBiosGetChar:
     div bx                                      ; Take the offset by the size of the buffer (need remander) 
 
     add dx, word [ds:KEYBOARD_BUFF_START]       ; Add the remander to the start of the buffer for a new char
-    mov word [ds:KEYBOARD_HEAD_PTR], dx         ; The keyboard trail can now accept a new incoming key :3
-    mov word [ds:KEYBOARD_TAIL_PTR], dx         ; The keyboard trail can now accept a new incoming key :3
+    mov word [ds:KEYBOARD_HEAD_PTR], dx         ; The keyboard head can now accept a new incoming key
+    mov word [ds:KEYBOARD_TAIL_PTR], dx         ; The keyboard tail can now accept a new incoming key
 
     pop ax                                      ; Restore the scan code and ascii char 
 
@@ -834,7 +833,6 @@ kbdBiosGetChar:
     pop dx
     pop bx
     pop ds
-    sti
 
     ret
 
@@ -904,11 +902,11 @@ kbdBiosWaitUntillKey:
 ;          AL    = Ascii code
 ;
 ;---------------------------------------------------
-    call kbdBiosFlushBuffer                   ; Flush the most recent char (to be safe)
+    call kbdBiosFlushBuffer                     ; Flush the most recent char (to be safe)
 
   .wait:
-    call kbdBiosGetChar                           ; Try to read a key from the bios kbd buffer
-    or ax, ax                                 ; When empty, just loop forever and ever :)
+    call kbdBiosGetChar                         ; Try to read a key from the bios kbd buffer
+    or ax, ax                                   ; When empty, just loop forever and ever :)
     jz .wait
 
     ret
