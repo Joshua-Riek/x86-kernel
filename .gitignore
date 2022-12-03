@@ -1,10 +1,3 @@
-*.o
-*.elf
-bin/*
-obj/*
-src/inc
-floppy.img
-floppy - Copy.img
-720k - Copy.img
-720k.img
+obj/**
+bin/**
 *~
