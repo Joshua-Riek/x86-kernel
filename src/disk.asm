@@ -1859,7 +1859,7 @@ deleteFile:
 ; Delete a file in the cwd and removes
 ; all fat clusters relating to the file.
 ;
-; Expects: DS:AX = Filename to remove
+; Expects: DS:SI = Filename to remove
 ;
 ; Returns: CF    = Carry Flag set on error
 ;
@@ -1894,6 +1894,7 @@ deleteFile:
 
     mov byte [es:di], 0xe5                      ; Mark file entry as deleted
     mov ax, word [di+FAT_DIR_FILESIZE]          ; Size in bytes of the file
+    mov si, word [di+FAT_DIR_FILESIZE+2]        ; Size in bytes of the file
     mov cx, word [di+FAT_DIR_CLUSTER_LO]        ; File cluster number
 
     mov es, bx
@@ -1904,17 +1905,16 @@ deleteFile:
 
     call unloadCwd                              ; Free the dir from memory
 
-    cmp ax, 0
-    je .done
+    mov dx, si
+    test ax, ax                                 ; Check to see if the file is empty
+    jnz .fileNotZero
+    test dx, dx
+    jz .done
 
-    ;call loadFat                                ; Allocate and read the FAT
-    ;jc .loadFatError
-
+  .fileNotZero:
     mov ax, cx
     call removeClusters
     jc .writeError2
-
-    ;call unloadFat                             ; Free the FAT from memory
 
   .done:
     pop ds                                      ; Restore registers
