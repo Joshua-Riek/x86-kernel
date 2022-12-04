@@ -661,6 +661,9 @@ doType:
     mov si, bx                                  ; Start by getting the filesize,
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
+    mov cx, dx
+    mov bx, ax
+    call roundFilesize
 
     call memAllocBytes
     jc .memError
@@ -668,8 +671,11 @@ doType:
     call readFile                               ; Now we read the file into memory
     jc .readFailure                             ; Size goes into ax:dx
 
-    call memFreeBytes                           ; Free up the memory
+    call roundFilesize
 
+    call memFreeBytes                           ; Free up the memory
+    xchg cx, dx
+    xchg bx, ax
     xchg ax, dx
 
     cmp ax, 0
@@ -785,9 +791,7 @@ doCopy:
     call fileSize                               ; also tests to see if the file exists
     jc .fileNotFound
 
-    clc
-    add dx, 0x2000
-    adc ax, 0
+    call roundFilesize
     call memAllocBytes                          ; Allocate space for the file 
     jc .memError
 
@@ -798,9 +802,7 @@ doCopy:
     call writeFile                              ; Finally write data into a new file
     jc .writeFailure
 
-    clc
-    add dx, 0x2000
-    adc ax, 0
+    call roundFilesize
     call memFreeBytes                           ; Free up the memory
 
     pop ds                                      ; Restore registers
@@ -815,12 +817,14 @@ doCopy:
     jmp cliLoop
 
   .writeFailure:
+    call roundFilesize
     call memFreeBytes                           ; Free up the memory used on error
     mov si, writeSectorErr
     call videoWriteStr
     jmp .error
 
   .readFailure:  
+    call roundFilesize
     call memFreeBytes                           ; Free up the memory used on error
     mov si, readSectorErr
     call videoWriteStr

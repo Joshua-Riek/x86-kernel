@@ -553,6 +553,7 @@ memFreeBytes:
 ;
 ;---------------------------------------------------
     push ax                                     ; Save registers
+    push bx
     push dx
 
     call logFreeMem
@@ -566,6 +567,7 @@ memFreeBytes:
     call memFreeBlocks
 
     pop dx                                      ; Restore registers
+    pop bx
     pop ax
 
   .done:

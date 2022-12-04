@@ -134,6 +134,19 @@ readClustersFAT12:
     cmp ax, 0x0ff8
     jae .fileLoaded                             ; Are we at the end of the file?
 
+    push dx
+    push cx
+    push ax
+    mov cl, 4
+    mov ax, word [bytesPerCluster+2]
+    shl ax, cl
+    mov dx, es
+    add dh, al
+    mov es, dx
+    pop ax
+    pop cx
+    pop dx
+
     clc
     add di, word [bytesPerCluster]              ; Add to the buffer address for the next cluster
     jnc .readCluster 
@@ -279,6 +292,19 @@ readClustersFAT16:
   .nextClusterCalculated:
     cmp ax, 0xfff8                              ; Are we at the end of the file?
     jae .fileLoaded
+
+    push dx
+    push cx
+    push ax
+    mov cl, 4
+    mov ax, word [bytesPerCluster+2]
+    shl ax, cl
+    mov dx, es
+    add dh, al
+    mov es, dx
+    pop ax
+    pop cx
+    pop dx
 
     clc
     add di, word [bytesPerCluster]              ; Add to the buffer address for the next cluster
@@ -754,23 +780,29 @@ writeClustersFAT12:
     inc si
     loop .zeroClusterLoop
 
-    mov cx, dx                                  ; Calculate how many clusters are required
-    mov bx, word [bytesPerCluster]              ; First take the hi word of the 32-bit filesize
-    xor dx, dx                                  ; Divide by bytes per cluster
-    div bx
-    xchg ax, cx                                 ; Now take the lo word of the 32-bit filesize
-    div bx                                      ; Divide again by bytes per cluster
-    or dx, dx
-    jz .loadFat                                 ; Add one if remander 
+    mov bx, ax
+    mov cx, dx
+    push bx
+    push cx
+    
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the size in bytes per cluster
+    mov ax, word [bytesPerSector]               ; So, take the bytes per sector
+    mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
+    mul bx
+
+    pop cx
+    pop bx
+    xchg ax, dx
+
+    xchg ax, bx
+    xchg dx, cx
+    call u32x32div
     inc ax
 
   .loadFat:
     mov word [.clustersNeeded], ax
     mov dx, ax
-
-    ;mov si, .tmpName 
-    ;call createFile                            ; Create the file to write
-    ;jc .createFileError
 
     cmp dx, 0                                   ; If no clusters are needed, do nothing
     je .fileZero
@@ -1003,6 +1035,19 @@ writeClustersFAT12:
     pop cx
     pop ax
 
+    push dx
+    push cx
+    push ax
+    mov cl, 4
+    mov ax, word [bytesPerCluster+2]
+    shl ax, cl
+    mov dx, es
+    add dh, al
+    mov es, dx
+    pop ax
+    pop cx
+    pop dx
+
     clc
     add di, word [bytesPerCluster]              ; Point to the next portion of data to write
     jnc .saveNextCluster
@@ -1102,26 +1147,32 @@ writeClustersFAT16:
     inc si
     loop .zeroClusterLoop
 
-    mov cx, dx                                  ; Calculate how many clusters are required
-    mov bx, word [bytesPerCluster]              ; First take the hi word of the 32-bit filesize
-    xor dx, dx                                  ; Divide by bytes per cluster
-    div bx
-    xchg ax, cx                                 ; Now take the lo word of the 32-bit filesize
-    div bx                                      ; Divide again by bytes per cluster
-    or dx, dx
-    jz .loadFat                                 ; Add one if remander 
+    mov bx, ax
+    mov cx, dx
+    push bx
+    push cx
+    
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the size in bytes per cluster
+    mov ax, word [bytesPerSector]               ; So, take the bytes per sector
+    mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
+    mul bx
+
+    pop cx
+    pop bx
+    xchg ax, dx
+
+    xchg ax, bx
+    xchg dx, cx
+    call u32x32div
     inc ax
 
   .loadFat:
     mov word [.clustersNeeded], ax
     mov dx, ax
 
-    ;mov si, .tmpName 
-    ;call createFile                             ; Create the file to write
-    ;jc .createFileError
-
-    cmp dx, 0                                   ; If no clusters are needed, do nothing
-    je .fileZero
+    ;cmp dx, 0                                   ; If no clusters are needed, do nothing
+    ;je .fileZero
 
     call loadFat                                ; Allocate and read the FAT16 table into memory
     jc .loadFatError
@@ -1297,6 +1348,17 @@ writeClustersFAT16:
 
     pop cx
     pop ax
+
+    push cx
+    push ax
+    mov cl, 4
+    mov ax, word [bytesPerCluster+2]
+    shl ax, cl
+    mov cx, es
+    add ch, al
+    mov es, cx
+    pop ax
+    pop cx
 
     clc
     add di, word [bytesPerCluster]              ; Point to the next portion of data to write
