@@ -63,8 +63,8 @@ all: kernel bootloader image
 ifeq ($(and $(shell which $(LD)),$(shell which $(OBJCOPY))),)
 kernel: $(BINDIR)/kernel.bin
 
-$(BINDIR)/kernel.bin: $(SRCDIR)/kernel.asm | $(BINDIR)
-	$(NASM) $^ -f bin -o $@
+$(BINDIR)/kernel.bin: $(SRCDIR)/kernel.asm $(INCLUDES) | $(BINDIR)
+	$(NASM) $< -f bin -o $@
 else
 kernel: $(BINDIR)/kernel.bin
 
@@ -79,7 +79,7 @@ $(OBJDIR)/kernel.o: $(SRCDIR)/kernel.asm $(INCLUDES) | $(OBJDIR)
 endif
 
 # Makefile target for both bootloaders
-ifeq (, $(shell which $(LD)))
+ifeq ($(and $(shell which $(LD)),$(shell which $(OBJCOPY))),)
 bootloader: $(BINDIR)/boot12.bin $(BINDIR)/boot16.bin
 
 $(BINDIR)/boot12.bin: $(SRCDIR)/boot12.asm | $(BINDIR)
