@@ -129,7 +129,7 @@ _start:
 ; Main kernel varables below
 ;---------------------------------------------------
 
-__CURRENT_BUILD db "x86 kernel v1.2 [compiled on ", __DATE__, "]", 10, 13, 10, 13, 0
+__CURRENT_BUILD db "x86 kernel v1.1 [compiled on ", __DATE__, "]", 10, 13, 10, 13, 0
 
 __GPL_NOTICE    db "Copyright (c) 2017-2022 Joshua Riek", 10, 13,
                 db "This program comes with ABSOLUTELY NO WARRANTY; for details", 10, 13
