@@ -2006,7 +2006,7 @@ readFile:
 
     call unloadCwd                              ; Free the dir from memory
 
-    cmp cx, 0
+    cmp ax, 0
     je .done
 
     mov di, word [.loadSEG]
@@ -2183,24 +2183,25 @@ roundFilesize:
 ;---------------------------------------------------
     push bx
     push cx
+    push ds
 
-    mov bx, ax
-    mov cx, dx
-    push bx
-    push cx
+    push cs
+    pop ds
 
+    push ax
+    push dx
+    
     xor dx, dx
     xor bh, bh                                  ; Calculate the size in bytes per cluster
     mov ax, word [bytesPerSector]               ; So, take the bytes per sector
     mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
     mul bx
-
-    pop cx
-    pop bx
-    xchg ax, dx
-
+    
     xchg ax, bx
     xchg dx, cx
+
+    pop ax
+    pop dx
     call u32x32div
     inc ax
 
@@ -2210,6 +2211,7 @@ roundFilesize:
     call u32x16mul
 
     xchg ax, dx
+    pop ds
     pop cx
     pop bx
     ret

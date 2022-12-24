@@ -20,7 +20,7 @@
     loMemUsedBlocks dw 0                        ; Current used blocks of memory
     loMemMapSeg     dw 0                        ; Memory map segment
     loMemMapOff     dw 0                        ; Memory map offset
-    kernelSize      dw 0x8000                   ; Static kernel size
+    kernelSize      dw 0x9000                   ; Static kernel size
 
 ;---------------------------------------------------
 setupMemory:

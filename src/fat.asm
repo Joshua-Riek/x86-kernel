@@ -69,50 +69,49 @@ readClustersFAT12:
     pop di
     pop es
  
-  .readCluster:
-    push ax                                     ; Save the current cluster
+  .clusterLoop:
+    push ax
 
-    xor bh, bh
-    xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
-    sub ax, 2                                   ; Subtract 2
-    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
-    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
-    add ax, word [startOfData]                  ; Add the userData 
+    dec ax
+    dec ax
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the first sector of the given cluster in ax
+    mov bl, byte [sectorsPerCluster]            ; First subtract 2 from the cluster
+    mul bx                                      ; Multiply the cluster by the sectors per cluster
+    add ax, word [startOfData]                  ; Finally add the first data sector
 
     xor ch, ch
     mov cl, byte [sectorsPerCluster]            ; Sectors to read
     call readSectors                            ; Read the sectors
     jc .readError
 
-    xor dx, dx  
-    pop ax                                      ; Current cluster number
-    
-  .calculateNextCluster12:                      ; Get the next cluster for FAT12 (cluster + (cluster * 1.5))
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
-    mul bx                                      ; Multiply the cluster by the numerator
-    mov bx, 2                                   ; Return value in ax and remainder in dx
-    div bx                                      ; Divide the cluster by the denominator
+    pop ax
    
   .loadNextCluster:
     push es
     push di
 
     mov di, word [.fatSEG]
-    mov es, di                                  ; Tempararly set es:di to the FAT12 buffer
+    mov es, di                                  ; Tempararly set es:di to the FAT buffer
     mov di, word [.fatOFF]
 
-    clc
-    add di, ax                                  ; Point to the next cluster in the FAT12 table
-    jnc .grabCluster 
+    xor dx, dx                                  ; Get the next cluster for FAT
+    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    mul bx                                      ; Multiply the cluster by the numerator
+    mov bl, 2                                   ; Return value in ax and remainder in dx
+    div bx                                      ; Divide the cluster by the denominator
 
-    push dx                                     ; Correct the offset into the FAT12 table
-    mov dx, es
-    add dh, 0x10
-    mov es, dx
-    pop dx
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, 0                                   ; Make sure to adjust for carry 
 
-  .grabCluster:
-    mov ax, word [es:di]                        ; Grab the next cluster in the FAT12 table
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov ax, es                                  ; Shift left by 4 bits
+    add ah, bl                                  ; Then add the higher half to the segment
+    mov es, ax
+
+    mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
 
     pop di
     pop es
@@ -120,45 +119,41 @@ readClustersFAT12:
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenCluster
 
-  .oddCluster:    
-    shr ax, 1                                   ; Drop the first 4 bits of the next cluster
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
+  .oddCluster:
+    mov cl, 4                                   ; Drop the first 4 bits of the next cluster
+    shr ax, cl
     jmp .nextClusterCalculated
 
   .evenCluster:
     and ax, 0x0fff                              ; Drop the last 4 bits of next cluster
 
-  .nextClusterCalculated:                       ; Register ax is set with the next cluster 
-    cmp ax, 0x0ff8
-    jae .fileLoaded                             ; Are we at the end of the file?
+  .nextClusterCalculated:
+    cmp ax, 0x0ff8                              ; Are we at the end of the file?
+    jae .fileLoaded
 
-    push dx
-    push cx
-    push ax
+    xchg bx, ax
+    xor dx, dx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
+    xchg bx, ax                                 ; Bytes per cluster in bx:dx
+
     mov cl, 4
-    mov ax, word [bytesPerCluster+2]
-    shl ax, cl
-    mov dx, es
-    add dh, al
-    mov es, dx
-    pop ax
-    pop cx
-    pop dx
+    shl dx, cl                                  ; Correct the segment offset based on the bytes per cluster
+    mov cx, es                                  ; Shift left by 4 bits
+    add ch, dl                                  ; Then add the lower half to the segment
+    mov es, cx
 
     clc
-    add di, word [bytesPerCluster]              ; Add to the buffer address for the next cluster
-    jnc .readCluster 
+    add di, bx                                  ; Add to the pointer offset
+    jnc .clusterLoop 
 
-  .fixBuffer:
-    push dx                                     ; An error will occur if the buffer in memory
+  .fixBuffer:                                   ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
-    pop dx
 
-    jmp .readCluster
+    jmp .clusterLoop                            ; Load the next file cluster
 
   .fileLoaded:
     call unloadFat
@@ -239,52 +234,48 @@ readClustersFAT16:
 
     pop di
     pop es
- 
-  .readCluster:
-    push ax                                     ; Save the current cluster
 
-    xor bh, bh
-    xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
-    sub ax, 2                                   ; Subtract 2
-    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
-    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
-    add ax, word [startOfData]                  ; Add the userData 
+  .clusterLoop:
+    push ax
+
+    dec ax
+    dec ax
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the first sector of the given cluster in ax
+    mov bl, byte [sectorsPerCluster]            ; First subtract 2 from the cluster
+    mul bx                                      ; Multiply the cluster by the sectors per cluster
+    add ax, word [startOfData]                  ; Finally add the first data sector
 
     xor ch, ch
     mov cl, byte [sectorsPerCluster]            ; Sectors to read
     call readSectors                            ; Read the sectors
     jc .readError
 
-    xor dx, dx
-    pop ax                                      ; Current cluster number
-
-  .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
-    mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
-    mul bx
+    pop ax
 
   .loadNextCluster:
     push es
     push di
 
     mov di, word [.fatSEG]
-    mov es, di                                  ; Tempararly set es:di to the FAT16 buffer
+    mov es, di                                  ; Tempararly set es:di to the FAT buffer
     mov di, word [.fatOFF]
 
-    clc
-    xor cx, cx
-    add di, ax                                  ; Add the offset into the FAT16 table
-    adc cx, dx                                  ; Add and carry the segment into the FAT16 table
+    xor dx, dx
+    mov cx, 2                                   ; Get the next cluster for FAT 
+    mul cx                                      ; Multiply the cluster by 2
 
-    shl cl, 1                                   ; Shift left 4 bits for the segment 
-    shl cl, 1
-    shl cl, 1
-    shl cl, 1
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, dx                                  ; Make sure to adjust for carry 
 
-    mov dx, es
-    add dh, cl                                  ; Now we can set the correct segment into the FAT16 table
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov dx, es                                  ; Shift left by 4 bits
+    add dh, bl                                  ; Then add the higher half to the segment
     mov es, dx
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
 
     pop di
     pop es
@@ -293,31 +284,29 @@ readClustersFAT16:
     cmp ax, 0xfff8                              ; Are we at the end of the file?
     jae .fileLoaded
 
-    push dx
-    push cx
-    push ax
+    xchg bx, ax
+    xor dx, dx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
+    xchg bx, ax                                 ; Bytes per cluster in bx:dx
+
     mov cl, 4
-    mov ax, word [bytesPerCluster+2]
-    shl ax, cl
-    mov dx, es
-    add dh, al
-    mov es, dx
-    pop ax
-    pop cx
-    pop dx
+    shl dx, cl                                  ; Correct the segment offset based on the bytes per cluster
+    mov cx, es                                  ; Shift left by 4 bits
+    add ch, dl                                  ; Then add the lower half to the segment
+    mov es, cx
 
-    clc
-    add di, word [bytesPerCluster]              ; Add to the buffer address for the next cluster
-    jnc .readCluster 
+    clc                                         ; Add to the pointer offset
+    add di, bx
+    jnc .clusterLoop 
 
-  .fixBuffer:
-    push dx                                     ; An error will occur if the buffer in memory
+  .fixBuffer:                                   ; An error will occur if the buffer in memory
     mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
-    pop dx
 
-    jmp .readCluster
+    jmp .clusterLoop                            ; Load the next file cluster
 
   .fileLoaded:
     call unloadFat
@@ -465,52 +454,44 @@ removeClustersFAT12:
     call loadFat                                ; Allocate and read the FAT
     jc .loadFatError
 
-  .nextCluster:
-    xor dx, dx  
-    
-  .calculateNextCluster12:                      ; Get the next cluster for FAT12 (cluster + (cluster * 1.5))
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
-    mul bx                                      ; Multiply the cluster by the numerator
-    mov bx, 2                                   ; Return value in ax and remainder in dx
-    div bx                                      ; Divide the cluster by the denominator
-   
   .loadNextCluster:
     push es
     push di
 
-    clc
-    add di, ax                                  ; Point to the next cluster in the FAT12 table
-    jnc .grabCluster 
+    xor dx, dx                                  ; Get the next cluster for FAT
+    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    mul bx                                      ; Multiply the cluster by the numerator
+    mov bl, 2                                   ; Return value in ax and remainder in dx
+    div bx                                      ; Divide the cluster by the denominator
 
-    push dx                                     ; Correct the offset into the FAT12 table
-    mov dx, es
-    add dh, 0x10
-    mov es, dx
-    pop dx
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, 0                                   ; Make sure to adjust for carry 
 
-  .grabCluster:
-    mov ax, word [es:di]                        ; Grab the next cluster in the FAT12 table
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov ax, es                                  ; Shift left by 4 bits
+    add dh, bl                                  ; Then add the higher half to the segment
+    mov es, ax
+
+    mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
 
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenCluster
 
   .oddCluster:
-    push ax
-    and ax, 0x000f
-    mov word [es:di], ax
-    pop ax
+    mov bx, ax
+    and bx, 0x000f
+    mov word [es:di], bx
 
-    shr ax, 1                                   ; Drop the first 4 bits of the next cluster
-    shr ax, 1
-    shr ax, 1
-    shr ax, 1
+    mov cl, 4                                   ; Drop the first 4 bits of the next cluster
+    shr ax, cl
     jmp .nextClusterCalculated
 
   .evenCluster:
-    push ax
-    and ax, 0xf000
-    mov word [es:di], ax
-    pop ax
+    mov bx, ax
+    and bx, 0xf000
+    mov word [es:di], bx
 
     and ax, 0x0fff                              ; Drop the last 4 bits of next cluster
 
@@ -521,14 +502,14 @@ removeClustersFAT12:
     cmp ax, 0x0ff8
     jae .eof                                    ; Are we at the end of the file?
 
-    jmp .nextCluster 
+    jmp .loadNextCluster 
 
   .eof:
     call writeFat                               ; Write the updated fat to disk
     jc .writeError
 
     call unloadFat
-    
+
   .done:
     pop ds                                      ; Restore registers
     pop es
@@ -591,47 +572,38 @@ removeClustersFAT16:
     call loadFat                                ; Allocate and read the FAT
     jc .loadFatError
 
-  .nextCluster:
-    xor dx, dx  
-    
-  .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
-    mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
-    mul bx
-
   .loadNextCluster:
     push es
     push di
 
-    clc
-    xor cx, cx
-    add di, ax                                  ; Add the offset into the FAT16 table
-    adc cx, dx                                  ; Add and carry the segment into the FAT16 table
+    xor dx, dx
+    mov cx, 2                                   ; Get the next cluster for FAT 
+    mul cx                                      ; Multiply the cluster by 2
 
-    shl cl, 1                                   ; Shift left 4 bits for the segment 
-    shl cl, 1
-    shl cl, 1
-    shl cl, 1
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, dx                                  ; Make sure to adjust for carry 
 
-    mov dx, es
-    add dh, cl                                  ; Now we can set the correct segment into the FAT16 table
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov dx, es                                  ; Shift left by 4 bits
+    add dh, bl                                  ; Then add the higher half to the segment
     mov es, dx
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
 
-    push ax
-    and ax, 0x0000
-    mov ax, 0
-    mov word [es:di], ax                        ; Zero out the cluster entry
-    pop ax
+    mov bx, ax
+    and bx, 0x0000
+    mov word [es:di], bx                        ; Zero out the cluster entry
 
-  .nextClusterCalculated:
     pop di
     pop es
 
+  .nextClusterCalculated:
     cmp ax, 0xfff8
     jae .eof                                    ; Are we at the end of the file?
 
-    jmp .nextCluster 
+    jmp .loadNextCluster 
 
   .eof:
     call writeFat                               ; Write the updated fat to disk
@@ -780,23 +752,20 @@ writeClustersFAT12:
     inc si
     loop .zeroClusterLoop
 
-    mov bx, ax
-    mov cx, dx
-    push bx
-    push cx
+    push ax
+    push dx
     
     xor dx, dx
     xor bh, bh                                  ; Calculate the size in bytes per cluster
     mov ax, word [bytesPerSector]               ; So, take the bytes per sector
     mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
     mul bx
-
-    pop cx
-    pop bx
-    xchg ax, dx
-
+    
     xchg ax, bx
     xchg dx, cx
+
+    pop ax
+    pop dx
     call u32x32div
     inc ax
 
@@ -820,8 +789,19 @@ writeClustersFAT12:
 
   .findFreeCluster:
     mov ax, word [es:di]                        ; Grab the next word in FAT
-    add di, 2                                   ; TODO: OVERFLOW ERROR?
-    
+
+    clc
+    add di, 2
+    jnc .checkOdd
+
+  .fixBuffer:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+
+  .checkOdd:
     and ax, 0x0fff                              ; Mask out for even cluster
     jz .foundFreeEven                           ; If zero, entry is free 
 
@@ -830,8 +810,19 @@ writeClustersFAT12:
     dec di                                      ; Decrease counter byte in FAT
 
     mov ax, word [es:di]                        ; Grab the next word in FAT
-    add di, 2                                   ; TODO: OVERFLOW ERROR?
 
+    clc
+    add di, 2
+    jnc .more
+
+  .fixBuffer2:
+    push dx                                     ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
+    add dh, 0x10                                ; it will trigger the carry flag, so correct
+    mov es, dx                                  ; extra segment by 0x1000
+    pop dx
+
+  .more:
     shr ax, 1                                   ; Shift out for odd cluster
     shr ax, 1
     shr ax, 1
@@ -844,11 +835,10 @@ writeClustersFAT12:
     jmp .findFreeCluster
 
   .foundFreeEven:
-    push si
-    mov si, .freeClusters
-    add si, dx                                  ; Offset into free cluster list
+    mov si, .freeClusters                       ; Point into the free cluster list
+    add si, dx
+
     mov word [ds:si], bx                        ; Put the cluster into the list
-    pop si
 
     dec cx                                      ; Check to see if we have all the clusters needed
     cmp cx, 0
@@ -859,11 +849,10 @@ writeClustersFAT12:
     jmp .moreOdd
 
   .foundFreeOdd:
-    push si
-    mov si, .freeClusters
-    add si, dx                                  ; Offset into free cluster list
+    mov si, .freeClusters                       ; Point into the free cluster list
+    add si, dx
+
     mov word [ds:si], bx                        ; Put the cluster into the list
-    pop si
 
     dec cx                                      ; Check to see if we have all the clusters needed
     cmp cx, 0
@@ -874,45 +863,45 @@ writeClustersFAT12:
     jmp .moreEven
 
   .freeClustersFound:
-    mov si, .freeClusters
+    pop di
+    pop es
 
     mov cx, 0
     mov word [.count], 1
     mov ax, word [.clustersNeeded]
-    pop di
-    pop es
 
   .chainClusterLoop:
-    push si                                     ; Now we must begin to write the cluster
-    mov si, .freeClusters                       ; chain into the FAT12 table
+    mov si, .freeClusters                       ; Point into the free cluster list
     add si, cx
 
     xor dx, dx
     mov ax, word [ds:si]
-    pop si
 
-  .calculateNextCluster12:                      ; Get the next cluster for FAT12 (cluster + (cluster * 1.5))
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
-    mul bx                                      ; Multiply the cluster by the numerator
-    mov bx, 2                                   ; Return value in ax and remainder in dx
-    div bx                                      ; Divide the cluster by the denominator
-   
   .loadNextCluster:
     push es                                     ; Save the current position in memory 
-    push di                                     ; For es:di contains the FAT12 location
+    push di                                     ; For es:di contains the FAT location
+    push cx
 
-    clc
-    add di, ax                                  ; Point to the next cluster in the FAT12 table
-    jnc .loadNextCluster2
+    xor dx, dx                                  ; Get the next cluster for FAT
+    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    mul bx                                      ; Multiply the cluster by the numerator
+    mov bl, 2                                   ; Return value in ax and remainder in dx
+    div bx                                      ; Divide the cluster by the denominator
 
-    push dx                                     ; An error will occur if the buffer in memory
-    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
-    add dh, 0x10                                ; it will trigger the carry flag, so correct
-    mov es, dx                                  ; extra segment by 0x1000
-    pop dx
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, 0                                   ; Make sure to adjust for carry 
+
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov ax, es                                  ; Shift left by 4 bits
+    add ah, bl                                  ; Then add the higher half to the segment
+    mov es, ax
+    
+    pop cx
 
   .loadNextCluster2:  
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT12 table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
     mov bx, word [.count]                       ; Check here to see if we have all the
     cmp bx, word [.clustersNeeded]              ; clusters we need to allocate
     je .lastCluster
@@ -921,19 +910,19 @@ writeClustersFAT12:
     jz .evenCluster
 
   .oddCluster:
-    push si
-    mov si, .freeClusters                       ; Our chain into the FAT12 table
+    mov si, .freeClusters                       ; Point into the free cluster list
     add si, cx
 
     and ax, 0x000f                              ; Zero out the bits for the next cluster
     mov bx, word [ds:si+2]                      ; Get the NEXT cluster
-    shl bx, 1                                   ; Shift left for correct FAT12 cluster format
+    shl bx, 1                                   ; Shift left for correct FAT cluster format
     shl bx, 1
     shl bx, 1
     shl bx, 1
     add ax, bx
-    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT12 table
-    pop si
+
+    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT table
+
     pop di
     pop es
 
@@ -943,15 +932,15 @@ writeClustersFAT12:
     jmp .chainClusterLoop
 
   .evenCluster:
-    push si
-    mov si, .freeClusters                       ; Our chain into the FAT12 table
+    mov si, .freeClusters                       ; Point into the free cluster list
     add si, cx
 
     and ax, 0xf000                              ; Zero out the bits for the next cluster
     mov bx, word [ds:si+2]                      ; Get the NEXT cluster
     add ax, bx
-    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT12 table
-    pop si
+
+    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT table
+    
     pop di
     pop es
 
@@ -961,11 +950,11 @@ writeClustersFAT12:
     jmp .chainClusterLoop
 
   .lastCluster:
-    or dx, dx                                   ; Double check to see if the last cluster
-    jz .evenLast                                ; is even or odd
+    or dx, dx                                   ; Double check to see if the last cluster is even or odd
+    jz .evenLast
 
   .oddLast:
-    and ax, 0x000f                              ;TODO: Potental error, not sure why i dont add 0xff80
+    and ax, 0x000f                              ; Potental error, not sure why i dont add 0xff80
     ;add ax, 0xff80
     add ax, 0xfff0
     jmp .chainDone
@@ -1008,57 +997,56 @@ writeClustersFAT12:
     mov cx, 0
 
   .saveLoop:
-    push si
-    mov si, .freeClusters
-    add si, cx                                  ; Grab the next word in our FAT12 table
-    mov ax, word [ds:si]
-    pop si
+    mov si, .freeClusters                       ; Point into the free cluster list
+    add si, cx
+
+    mov ax, word [ds:si]                        ; Grab the next cluster from the FAT table
 
     cmp ax, 0                                   ; Check for the last cluster to write
     je .fileSaved
 
-    push ax                                     ; Current cluster
     push cx                                     ; Offset into free clusters
+    push ax                                     ; Current cluster
 
-    xor bh, bh
-    xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
-    sub ax, 2                                   ; Subtract 2
-    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
-    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
-    add ax, word [startOfData]                  ; Add the userData 
+    dec ax
+    dec ax
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the first sector of the given cluster in ax
+    mov bl, byte [sectorsPerCluster]            ; First subtract 2 from the cluster
+    mul bx                                      ; Multiply the cluster by the sectors per cluster
+    add ax, word [startOfData]                  ; Finally add the first data sector
 
     xor ch, ch
-    mov cl, byte [sectorsPerCluster]            ; Sectors to read
-    call writeSectors
+    mov cl, byte [sectorsPerCluster]            ; Sectors to write
+    call writeSectors                           ; Write the sectors
     jc .writeSectorsError
 
-    pop cx
     pop ax
 
-    push dx
-    push cx
-    push ax
+    xchg bx, ax
+    xor dx, dx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
+    xchg bx, ax                                 ; Bytes per cluster in bx:dx
+
     mov cl, 4
-    mov ax, word [bytesPerCluster+2]
-    shl ax, cl
-    mov dx, es
-    add dh, al
-    mov es, dx
-    pop ax
-    pop cx
-    pop dx
+    shl dx, cl                                  ; Correct the segment offset based on the bytes per cluster
+    mov cx, es                                  ; Shift left by 4 bits
+    add ch, dl                                  ; Then add the lower half to the segment
+    mov es, cx
 
     clc
-    add di, word [bytesPerCluster]              ; Point to the next portion of data to write
+    add di, bx                                  ; Point to the next portion of data to write
     jnc .saveNextCluster
 
-    push dx                                     ; An error will occur if the buffer in memory
-    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+  .fixBuffer3:                                  ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
-    pop dx
 
   .saveNextCluster:
+    pop cx
     inc cx
     inc cx
     jmp .saveLoop
@@ -1139,7 +1127,7 @@ writeClustersFAT16:
     pop word [.loadSEG]
 
     mov si, .freeClusters                       ; TODO: dynamic allocation for free cluster list
-    mov cx, 2048
+    mov cx, 4048
 
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
@@ -1147,23 +1135,21 @@ writeClustersFAT16:
     inc si
     loop .zeroClusterLoop
 
-    mov bx, ax
-    mov cx, dx
-    push bx
-    push cx
+
+    push ax
+    push dx
     
     xor dx, dx
     xor bh, bh                                  ; Calculate the size in bytes per cluster
     mov ax, word [bytesPerSector]               ; So, take the bytes per sector
     mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
     mul bx
-
-    pop cx
-    pop bx
-    xchg ax, dx
-
+    
     xchg ax, bx
     xchg dx, cx
+
+    pop ax
+    pop dx
     call u32x32div
     inc ax
 
@@ -1187,12 +1173,14 @@ writeClustersFAT16:
 
   .findFreeCluster:
     mov ax, word [es:di]                        ; Grab the next word in FAT
+
     clc
     add di, 2
     jnc .checkFree
 
+  .fixBuffer:
     push dx                                     ; An error will occur if the buffer in memory
-    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
     pop dx
@@ -1206,11 +1194,10 @@ writeClustersFAT16:
     jmp .findFreeCluster
 
   .foundFree:
-    push si
     mov si, .freeClusters
     add si, dx                                  ; Offset into free cluster list
+
     mov word [ds:si], bx                        ; Put the cluster into the list
-    pop si
 
     dec cx                                      ; Check to see if we have all the clusters needed
     cmp cx, 0
@@ -1219,64 +1206,56 @@ writeClustersFAT16:
     inc dx                                      ; If not, continute to next cluster 
     inc dx
     jmp .more
-  
 
   .freeClustersFound:
-    mov si, .freeClusters
+    pop di
+    pop es
 
     mov cx, 0
     mov word [.count], 1
     mov ax, word [.clustersNeeded]
-    pop di
-    pop es
 
   .chainClusterLoop:
-    push si                                     ; Now we must begin to write the cluster
-    mov si, .freeClusters                       ; chain into the FAT16 table
+    mov si, .freeClusters                       ; Point into the free cluster list
     add si, cx
 
-    xor dx, dx
-    mov ax, word [ds:si]
-    pop si
-
-  .calculateNextCluster16:                      ; Get the next cluster for FAT16 (cluster * 2)
-    mov bx, 2                                   ; Multiply the cluster by two (cluster is in ax)
-    mul bx
+    mov ax, word [ds:si]                        ; Grab a free cluster from the free cluster list
 
   .loadNextCluster:
-    push es                                     ; Save the current position in memory 
-    push di                                     ; For es:di contains the FAT12 location
+    push es
+    push di
     push cx
 
-    clc
-    xor cx, cx
-    add di, ax                                  ; Add the offset into the FAT16 table
-    adc cx, dx                                  ; Add and carry the segment into the FAT16 table
+    xor dx, dx
+    mov cx, 2                                   ; Get the next cluster for FAT 
+    mul cx                                      ; Multiply the cluster by 2
 
-    shl cl, 1                                   ; Shift left 4 bits for the segment 
-    shl cl, 1
-    shl cl, 1
-    shl cl, 1
+    xor bx, bx
+    add di, ax                                  ; Add the offset into the FAT table
+    adc bx, dx                                  ; Make sure to adjust for carry 
 
-    mov dx, es
-    add dh, cl                                  ; Now we can set the correct segment into the FAT16 table
+    mov cl, 4
+    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    mov dx, es                                  ; Shift left by 4 bits
+    add dh, bl                                  ; Then add the higher half to the segment
     mov es, dx
+
     pop cx
 
   .loadNextCluster2:  
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT16 table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
     mov bx, word [.count]                       ; Check here to see if we have all the
     cmp bx, word [.clustersNeeded]              ; clusters we need to allocate
     je .lastCluster
 
-    push si
-    mov si, .freeClusters
+    mov si, .freeClusters                       ; Point into the free cluster list
     add si, cx
+
     mov bx, word [ds:si+2]                      ; Get the NEXT cluster
-    pop si
     add ax, bx
 
-    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT16 table
+    mov word [es:di], ax                        ; Store the cluster back into the loaded FAT table
+
     pop di
     pop es
 
@@ -1289,11 +1268,11 @@ writeClustersFAT16:
     mov ax, 0xffff
 
   .chainDone:
-    mov word [es:di], ax                        ; Finally store the last cluster into the FAT16 table
+    mov word [es:di], ax                        ; Finally store the last cluster into the FAT table
     pop di
     pop es
 
-    call writeFat                               ; Then write the new FAT16 table to the disk 
+    call writeFat                               ; Then write the new FAT table to the disk 
     jc .writeFatError
 
     call unloadFat                              ; Kiss that FAT ass goodbye and unallocate it from mem
@@ -1322,55 +1301,59 @@ writeClustersFAT16:
     mov cx, 0
 
   .saveLoop:
-    push si
-    mov si, .freeClusters
-    add si, cx                                  ; Grab the next word in our FAT16 table
-    mov ax, word [ds:si]
-    pop si
+    mov si, .freeClusters                       ; Point into the free cluster list
+    add si, cx
+
+    mov ax, word [ds:si]                        ; Grab the next cluster from the FAT table
 
     cmp ax, 0                                   ; Check for the last cluster to write
     je .fileSaved
 
-    push ax                                     ; Current cluster
     push cx                                     ; Offset into free clusters
+    push ax                                     ; Current cluster
 
-    xor bh, bh
-    xor dx, dx                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
-    sub ax, 2                                   ; Subtract 2
-    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
-    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
-    add ax, word [startOfData]                  ; Add the userData 
+    dec ax
+    dec ax
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the first sector of the given cluster in ax
+    mov bl, byte [sectorsPerCluster]            ; First subtract 2 from the cluster
+    mul bx                                      ; Multiply the cluster by the sectors per cluster
+    add ax, word [startOfData]                  ; Finally add the first data sector
 
     xor ch, ch
-    mov cl, byte [sectorsPerCluster]            ; Sectors to read
-    call writeSectors
+    mov cl, byte [sectorsPerCluster]            ; Sectors to write
+    call writeSectors                           ; Write the sectors
     jc .writeSectorsError
 
-    pop cx
     pop ax
+
+    xchg cx, ax
+    xor dx, dx
+    xor bh, bh                                  ; Calculate the size in bytes per cluster
+    mov ax, word [bytesPerSector]               ; So, take the bytes per sector
+    mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
+    mul bx
+    xchg cx, ax
 
     push cx
-    push ax
     mov cl, 4
-    mov ax, word [bytesPerCluster+2]
-    shl ax, cl
-    mov cx, es
-    add ch, al
-    mov es, cx
-    pop ax
-    pop cx
+    shl dx, cl
+    mov bx, es
+    add bh, dl
+    mov es, bx
+    pop bx
 
     clc
-    add di, word [bytesPerCluster]              ; Point to the next portion of data to write
+    add di, bx                                  ; Point to the next portion of data to write
     jnc .saveNextCluster
 
-    push dx                                     ; An error will occur if the buffer in memory
-    mov dx, es                                  ; overlaps a 64k page boundry, when bx overflows
+  .fixBuffer2:                                  ; An error will occur if the buffer in memory
+    mov dx, es                                  ; overlaps a 64k page boundry, when di overflows
     add dh, 0x10                                ; it will trigger the carry flag, so correct
     mov es, dx                                  ; extra segment by 0x1000
-    pop dx
 
   .saveNextCluster:
+    pop cx
     inc cx
     inc cx
     jmp .saveLoop
@@ -1395,8 +1378,8 @@ writeClustersFAT16:
     jmp .error
 
   .writeSectorsError:                           ; Was able to write FAT
-    pop cx                                      ; But, error on writing clusters to disk
-    pop ax
+    pop ax                                      ; But, error on writing clusters to disk
+    pop cx
     jmp .error
 
   .loadFatError:
@@ -1416,7 +1399,7 @@ writeClustersFAT16:
   .loadSEG dw 0
   .loadOFF dw 0
   .clustersNeeded dw 0
-  .freeClusters times 2048 dw 0
+  .freeClusters times 4048 dw 0
 
 ;--------------------------------------------------
 writeClusters:   
@@ -1508,7 +1491,7 @@ fatFmtTimeAndDate:
 ; Expects: Nothing
 ;
 ; Returns: AX    = Time
-; Returns: DX    = Date
+;          DX    = Date
 ;
 ;--------------------------------------------------  
     push bx                                     ; Save registers

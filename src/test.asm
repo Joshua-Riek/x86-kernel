@@ -36,7 +36,7 @@
   %%str1:
     db %1, 0
   %%endstr1:
-    mov si, %%endstr1
+    mov si, %%str1
     call deleteFile
 %endmacro
 

@@ -116,10 +116,10 @@ _start:
 %include "src/video.asm"
 %include "src/cmos.asm"
 %include "src/disk.asm"
-%include "src/test.asm"
 %include "src/math.asm"
 %include "src/cli.asm"
 %include "src/dos.asm"
+%include "src/test.asm"
 
 %ifnidn __OUTPUT_FORMAT__, elf
     org 0x1000
