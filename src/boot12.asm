@@ -1,5 +1,6 @@
 ;  boot12.asm
 ;
+;  This program is a FAT12 bootloader
 ;  Copyright (c) 2017-2022, Joshua Riek
 ;
 ;  This program is free software: you can redistribute it and/or modify
@@ -121,14 +122,15 @@ reallocatedEntry:
 ;---------------------------------------------------
 
 allocDiskbuffer:
-    xor ax, ax                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [fats]                         ; Move number of fats into al
-    mul word [fatSectors]                       ; Move fat sectors into bx
+    xor ah, ah
+    xor dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [fats]                         ; Take the number of fats
+    mul word [fatSectors]                       ; And multiply that by the number of sectors per fat
 
     push ax                                     ; Save the size of the fat in sectors for later 
     push ax                                     ; Save it again to calculate the starting sector of the root dir
 
-    mov bx, [bytesPerSector]                    ; Get the size of fat in 16-byte paragraphs
+    mov bx, word [bytesPerSector]               ; Get the size of fat in 16-byte paragraphs
     mov cl, 4                                   ; Shift bits left (ax*(2^4))
     shr bx, cl                                  ; Align to 16-byte paragraphs
     mul bx
@@ -147,14 +149,14 @@ loadRoot:
     pop cx
     add cx, word [reservedSectors]              ; Increase cx by the reserved sectors
 
-    mov ax, 32
-    xor dx, dx                                  ; Size of root dir = (rootDirEntries * 32) / bytesPerSector
-    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
-    div word [bytesPerSector]                   ; Divided by the number of bytes used per sector
+    xor dx, dx
+    mov ax, 32                                  ; Calculate the size of the root dir in sectors
+    mul word [rootDirEntries]                   ; Multiply the number of root dir entries by 32
+    div word [bytesPerSector]                   ; Divide by the number of bytes used per sector
     xchg cx, ax
 
-    mov word [userData], ax                     ; start of user data = startOfRoot + numberOfRoot
-    add word [userData], cx                     ; Therefore, just add the size and location of the root directory
+    mov word [startOfData], ax                  ; Calculate the first data sector
+    add word [startOfData], cx                  ; Just add the size and location of the root dir
 
     xor dx, dx
     call readSectors                            ; Load the root directory into the disk buffer
@@ -164,7 +166,7 @@ loadRoot:
 ;---------------------------------------------------
 
 findFile:
-    mov dx, word [rootDirEntries]               ; Search through all of the root dir entrys for the kernel
+    mov dx, word [rootDirEntries]               ; Search through all of the root dir entries for the kernel
     push di
 
   .searchRoot:
@@ -244,30 +246,28 @@ readClusters:
     dec ax
     dec ax
     xor dx, dx
-    xor bh, bh                                  ; Get the cluster start = (cluster - 2) * sectorsPerCluster + userData
-    mov bl, byte [sectorsPerCluster]            ; Sectors per cluster is a byte value
-    mul bx                                      ; Multiply (cluster - 2) * sectorsPerCluster
-    add ax, word [cs:userData]                  ; Add the userData
+    xor bh, bh                                  ; Calculate the first sector of the given cluster in ax
+    mov bl, byte [sectorsPerCluster]            ; First subtract 2 from the cluster
+    mul bx                                      ; Multiply the cluster by the sectors per cluster
+    add ax, word [cs:startOfData]               ; Finally add the first data sector
 
-    xor ch, ch
-    mov cl, byte [sectorsPerCluster]            ; Sectors to read
+    mov cx, bx                                  ; Sectors to read
     call readSectors                            ; Read the sectors
 
-    xor dx, dx
-    pop ax                                      ; Current cluster number
-
-  .calculateNextCluster:                        ; Get the next cluster for FAT12 (cluster + (cluster * 1.5))
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
-    mul bx                                      ; Multiply the cluster by the numerator
-    mov bl, 2                                   ; Return value in ax and remainder in dx
-    div bx                                      ; Divide the cluster by the denominator
+    pop ax
 
   .loadNextCluster:
     push ds
     push si
 
-    add si, ax                                  ; Point to the next cluster in the FAT entry
-    mov ax, word [ds:si]                        ; Load ax to the next cluster in FAT
+    xor dx, dx                                  ; Get the next cluster for fat
+    mov bl, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    mul bx                                      ; Multiply the cluster by the numerator
+    dec bx                                      ; Return value in ax and remainder in dx
+    div bx                                      ; Divide the cluster by the denominator
+
+    add si, ax                                  ; Point to the next cluster in the fat entry
+    mov ax, word [ds:si]                        ; Load ax to the next cluster in fat
 
     pop si
     pop ds
@@ -287,24 +287,21 @@ readClusters:
     cmp ax, 0x0ff8                              ; Are we at the end of the file?
     jae .done
 
-    xchg cx, ax
+    xchg bx, ax
     xor dx, dx
-    xor bh, bh                                  ; Calculate the size in bytes per cluster
-    mov ax, word [bytesPerSector]               ; So, take the bytes per sector
-    mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
-    mul bx
-    xchg cx, ax
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
+    xchg bx, ax                                 ; Bytes per cluster in bx:dx
 
-    push cx
     mov cl, 4
-    shl dx, cl
-    mov bx, es
-    add bh, dl
-    mov es, bx
-    pop cx
+    shl dx, cl                                  ; Correct the segment offset based on the bytes per cluster
+    mov cx, es                                  ; Shift left by 4 bits
+    add ch, dl                                  ; Then add the lower half to the segment
+    mov es, cx
 
-    clc
-    add di, cx                                  ; Add to the pointer offset
+    clc                                         ; Add to the pointer offset
+    add di, bx
     jnc .clusterLoop 
 
   .fixBuffer:                                   ; An error will occur if the buffer in memory
@@ -321,8 +318,7 @@ readClusters:
 readSectors:
 ;
 ; Read sectors starting at a given sector by 
-; the given times and load into a buffer. Please
-; note that this may allocate up to 128KB of ram.
+; the given times and load into a buffer.
 ;
 ; Expects: AX:DX = Starting sector/ lba
 ;          ES:DI = Location to load sectors
@@ -345,7 +341,7 @@ readSectors:
     push cx
     push dx
 
-    div word [sectorsPerTrack]                  ; Divide the lba (value in ax:dx) by sectorsPerTrack
+    div word [sectorsPerTrack]                  ; Divide lba by the sectors per track
     mov cx, dx                                  ; Save the absolute sector value 
     inc cx
 
@@ -385,9 +381,12 @@ readSectors:
     pop cx
     pop ax
 
-    inc ax                                      ; Increase the next sector to read
-    add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
+    clc
+    add ax, 1                                   ; Add one for the the next lba value
+    adc dx, 0                                   ; Make sure to adjust dx for carry
 
+    clc
+    add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
     jnc .nextSector 
 
   .fixBuffer:
@@ -465,7 +464,7 @@ error:
 
     errorMsg       db "Error!", 0               ; Error reading disk or file was not found
 
-    userData       dw 0                         ; Start of the data sectors
+    startOfData    dw 0                         ; Start of the data sectors
     drive          db 0                         ; Boot drive number
 
     filename       db "KERNEL  BIN"             ; Filename
