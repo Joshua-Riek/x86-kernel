@@ -80,8 +80,7 @@ readClustersFAT12:
     mul bx                                      ; Multiply the cluster by the sectors per cluster
     add ax, word [startOfData]                  ; Finally add the first data sector
 
-    xor ch, ch
-    mov cl, byte [sectorsPerCluster]            ; Sectors to read
+    mov cx, bx                                  ; Sectors to read
     call readSectors                            ; Read the sectors
     jc .readError
 
@@ -95,23 +94,23 @@ readClustersFAT12:
     mov es, di                                  ; Tempararly set es:di to the FAT buffer
     mov di, word [.fatOFF]
 
-    xor dx, dx                                  ; Get the next cluster for FAT
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    xor dx, dx                                  ; Get the next cluster for fat
+    mov bl, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
     mul bx                                      ; Multiply the cluster by the numerator
-    mov bl, 2                                   ; Return value in ax and remainder in dx
+    dec bx                                      ; Return value in ax and remainder in dx
     div bx                                      ; Divide the cluster by the denominator
 
     xor bx, bx
-    add di, ax                                  ; Add the offset into the FAT table
+    add di, ax                                  ; Add the offset into the fat table
     adc bx, 0                                   ; Make sure to adjust for carry 
 
     mov cl, 4
-    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    shl bl, cl                                  ; Correct the segment based on the offset into the fat table
     mov ax, es                                  ; Shift left by 4 bits
     add ah, bl                                  ; Then add the higher half to the segment
     mov es, ax
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
+    mov ax, word [es:di]                        ; Load ax to the next cluster in fat
 
     pop di
     pop es
@@ -246,8 +245,7 @@ readClustersFAT16:
     mul bx                                      ; Multiply the cluster by the sectors per cluster
     add ax, word [startOfData]                  ; Finally add the first data sector
 
-    xor ch, ch
-    mov cl, byte [sectorsPerCluster]            ; Sectors to read
+    mov cx, bx                                  ; Sectors to read
     call readSectors                            ; Read the sectors
     jc .readError
 
@@ -258,24 +256,24 @@ readClustersFAT16:
     push di
 
     mov di, word [.fatSEG]
-    mov es, di                                  ; Tempararly set es:di to the FAT buffer
+    mov es, di                                  ; Tempararly set es:di to the fat buffer
     mov di, word [.fatOFF]
 
     xor dx, dx
-    mov cx, 2                                   ; Get the next cluster for FAT 
+    mov cx, 2                                   ; Get the next cluster for fat 
     mul cx                                      ; Multiply the cluster by 2
 
     xor bx, bx
-    add di, ax                                  ; Add the offset into the FAT table
+    add di, ax                                  ; Add the offset into the fat table
     adc bx, dx                                  ; Make sure to adjust for carry 
 
     mov cl, 4
-    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    shl bl, cl                                  ; Correct the segment based on the offset into the fat table
     mov dx, es                                  ; Shift left by 4 bits
     add dh, bl                                  ; Then add the higher half to the segment
     mov es, dx
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the fat table
 
     pop di
     pop es
@@ -378,23 +376,20 @@ readClusters:
     cmp word [sectors], 0
     jne .smallSectors
 
-  .largeSectors:                                ; I have found (when testing a 2GB image)
-    mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
-    mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
+  .largeSectors:                                ; Use huge sectors for fat16 
+    mov ax, word [hugeSectors]
+    mov dx, word [hugeSectors+2]
     jmp .calculateTotalClusters
 
-  .smallSectors:                                ; Normally this value should be used.
+  .smallSectors:                                ; Use sectors for fat12
     mov ax, word [sectors]
     xor dx, dx
 
-  .calculateTotalClusters:
-    clc                                         ; Now we can find the total ammount of clusters
-    xor bh, bh                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
-    mov bl, byte [sectorsPerCluster]
-    sub ax, word [startOfData]
-    jnc .div
-    dec dx
-  .div:
+   .calculateTotalClusters:
+    xor bh, bh 
+    sub ax, word [startOfData]                  ; Subtract the total number of sectors by the start of data
+    sbb dx, 0
+    mov bl, byte [sectorsPerCluster]            ; Divided by the sectors per cluster
     div bx
 
     xchg cx, ax                                 ; Current cluster number
@@ -458,23 +453,23 @@ removeClustersFAT12:
     push es
     push di
 
-    xor dx, dx                                  ; Get the next cluster for FAT
-    mov bx, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
+    xor dx, dx                                  ; Get the next cluster for fat
+    mov bl, 3                                   ; We want to multiply by 1.5 so divide by 3/2 
     mul bx                                      ; Multiply the cluster by the numerator
-    mov bl, 2                                   ; Return value in ax and remainder in dx
+    dec bx                                      ; Return value in ax and remainder in dx
     div bx                                      ; Divide the cluster by the denominator
 
     xor bx, bx
-    add di, ax                                  ; Add the offset into the FAT table
+    add di, ax                                  ; Add the offset into the fat table
     adc bx, 0                                   ; Make sure to adjust for carry 
 
     mov cl, 4
-    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    shl bl, cl                                  ; Correct the segment based on the offset into the fat table
     mov ax, es                                  ; Shift left by 4 bits
-    add dh, bl                                  ; Then add the higher half to the segment
+    add ah, bl                                  ; Then add the higher half to the segment
     mov es, ax
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in FAT
+    mov ax, word [es:di]                        ; Load ax to the next cluster in fat
 
     or dx, dx                                   ; Is the cluster caluclated even?
     jz .evenCluster
@@ -577,20 +572,20 @@ removeClustersFAT16:
     push di
 
     xor dx, dx
-    mov cx, 2                                   ; Get the next cluster for FAT 
+    mov cx, 2                                   ; Get the next cluster for fat 
     mul cx                                      ; Multiply the cluster by 2
 
     xor bx, bx
-    add di, ax                                  ; Add the offset into the FAT table
+    add di, ax                                  ; Add the offset into the fat table
     adc bx, dx                                  ; Make sure to adjust for carry 
 
     mov cl, 4
-    shl bl, cl                                  ; Correct the segment based on the offset into the FAT table
+    shl bl, cl                                  ; Correct the segment based on the offset into the fat table
     mov dx, es                                  ; Shift left by 4 bits
     add dh, bl                                  ; Then add the higher half to the segment
     mov es, dx
 
-    mov ax, word [es:di]                        ; Load ax to the next cluster in the FAT table
+    mov ax, word [es:di]                        ; Load ax to the next cluster in the fat table
 
     mov bx, ax
     and bx, 0x0000
@@ -668,23 +663,20 @@ removeClusters:
     cmp word [sectors], 0
     jne .smallSectors
 
-  .largeSectors:                                ; I have found (when testing a 2GB image)
-    mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
-    mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
+  .largeSectors:                                ; Use huge sectors for fat16 
+    mov ax, word [hugeSectors]
+    mov dx, word [hugeSectors+2]
     jmp .calculateTotalClusters
 
-  .smallSectors:                                ; Normally this value should be used.
+  .smallSectors:                                ; Use sectors for fat12
     mov ax, word [sectors]
     xor dx, dx
 
    .calculateTotalClusters:
-    clc                                         ; Now we can find the total ammount of clusters
-    xor bh, bh                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
-    mov bl, byte [sectorsPerCluster]
-    sub ax, word [startOfData]
-    jnc .div
-    dec dx
-  .div:
+    xor bh, bh 
+    sub ax, word [startOfData]                  ; Subtract the total number of sectors by the start of data
+    sbb dx, 0
+    mov bl, byte [sectorsPerCluster]            ; Divided by the sectors per cluster
     div bx
 
     xchg cx, ax                                 ; Current cluster number
@@ -1127,7 +1119,7 @@ writeClustersFAT16:
     pop word [.loadSEG]
 
     mov si, .freeClusters                       ; TODO: dynamic allocation for free cluster list
-    mov cx, 4048
+    mov cx, 2048
 
   .zeroClusterLoop:                             ; Just to make sure no other clusters
     mov word [ds:si], 0                         ; are left over on further calls of
@@ -1399,7 +1391,7 @@ writeClustersFAT16:
   .loadSEG dw 0
   .loadOFF dw 0
   .clustersNeeded dw 0
-  .freeClusters times 4048 dw 0
+  .freeClusters times 2048 dw 0
 
 ;--------------------------------------------------
 writeClusters:   
@@ -1436,23 +1428,20 @@ writeClusters:
     cmp word [sectors], 0
     jne .smallSectors
 
-  .largeSectors:                                ; I have found (when testing a 2GB image)
-    mov ax, word [hugeSectors]                  ; that some FAT16 images have huge sectors, 
-    mov dx, word [hugeSectors+2]                ; so adjust and calculate accordingly.
+  .largeSectors:                                ; Use huge sectors for fat16 
+    mov ax, word [hugeSectors]
+    mov dx, word [hugeSectors+2]
     jmp .calculateTotalClusters
-    
-  .smallSectors:                                ; Normally this value should be used.
+
+  .smallSectors:                                ; Use sectors for fat12
     mov ax, word [sectors]
     xor dx, dx
 
    .calculateTotalClusters:
-    clc                                         ; Now we can find the total ammount of clusters
-    xor bh, bh                                  ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
-    mov bl, byte [sectorsPerCluster]
-    sub ax, word [startOfData]
-    jnc .div
-    dec dx
-  .div:
+    xor bh, bh 
+    sub ax, word [startOfData]                  ; Subtract the total number of sectors by the start of data
+    sbb dx, 0
+    mov bl, byte [sectorsPerCluster]            ; Divided by the sectors per cluster
     div bx
 
     xchg cx, ax                                 ; Current cluster number

@@ -41,9 +41,7 @@ bpbBuffer:
     rootDirSize       dw 0
     rootDirSector     dw 0
     startOfData       dw 0
-    totalClusters     dw 0
     sectorsPerFat     dw 0
-    bytesPerCluster   dd 0
     drive             db 0
     cwdCluster        dw 0
     cwdSEG            dw 0
@@ -108,43 +106,30 @@ setupDisk:
     mov cx, 61
     rep movsb                                   ; Copy 61 bytes from ds:si to es:di to fill the table
 
-    xor dx, dx
-    mov ax, 32                                  ; Size of root dir = (rootDirEntries * 32) / bytesPerSector
-    mul word [cs:rootDirEntries]                ; Multiply by the total size of the root directory
-    div word [cs:bytesPerSector]                ; Divided by the number of bytes used per sector
     xor cx, cx
+    xor dx, dx
+    mov ax, 32                                  ; Calculate the size of the root dir in sectors
+    mul word [cs:rootDirEntries]                ; Multiply the number of root dir entries by 32
+    div word [cs:bytesPerSector]                ; Divide by the number of bytes used per sector
     xchg cx, ax
 
-    mov al, byte [cs:fats]                      ; Location of root dir = (fats * fatSectors) + reservedSectors
-    mul word [cs:fatSectors]                    ; Multiply by the sectors used
+    xor ah, ah
+    mov dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [cs:fats]                      ; Take the number of fats
+    mul word [cs:fatSectors]                    ; And multiply that by the number of sectors per fat
+    mov word [cs:sectorsPerFat], ax
     add ax, word [cs:reservedSectors]           ; Increase ax by the reserved sectors
   
     mov word [cs:rootDirSize], cx               ; Root dir size
     mov word [cs:rootDirSector], ax             ; Starting sector of the root dir
 
-    mov word [cs:startOfData], ax               ; Start of the user data area 
-    add word [cs:startOfData], cx
+    mov word [cs:startOfData], ax               ; Calculate the first data sector
+    add word [cs:startOfData], cx               ; Just add the size and location of the root dir
 
     xor dx, dx
-    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [cs:fats]                      ; Move number of fats into al
-    mul word [cs:fatSectors]                    ; Move fat sectors into bx
-    mov word [cs:sectorsPerFat], ax
-
-    xor dx, dx
-    mov ax, word [cs:reservedSectors]           ; Total fat clusters = (sectors - startOfUserData) / sectorsPerCluster
-    mov bx, word [cs:sectors]                   ; Take the total sectors subtracted
-    sub bx, word [cs:startOfData]               ; by the start of the data sectors
-    div word [cs:sectorsPerCluster]             ; Now divide by the sectors per cluster
-    mov word [cs:totalClusters], ax
-
-    xor dx, dx
-    mov ax, word [cs:bytesPerSector]
-    mov bl, byte [cs:sectorsPerCluster]
-    xor bh, bh
-    mul bx
-    mov word [cs:bytesPerCluster], ax
-    mov word [cs:bytesPerCluster+2], dx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
 
     call logBpb
 
@@ -180,11 +165,11 @@ setupDisk:
 readSectors:
 ;
 ; Read sectors starting at a given sector by 
-; the given times and load into a buffer. 
+; the given times and load into a buffer.
 ;
-; Expects: ES:DI = Location of data
-;          AX:DX = Starting sector/ lba
-;          CX    = Number of sectors to read      
+; Expects: AX:DX = Starting sector/ lba
+;          ES:DI = Location to load sectors
+;          CX    = Number of sectors to read
 ;
 ; Returns: CF    = Carry flag set on error
 ;
@@ -201,37 +186,30 @@ readSectors:
     mov bx, cs                                  ; Ensure corret data segment
     mov ds, bx
 
-    mov bx, di                                  ; Set disk buffer offset to bx
+    mov bx, di                                  ; Convert es:di to es:bx for int 13h
 
   .sectorLoop:
     push ax
     push cx
     push dx
 
-    push bx                                     ; Save disk buffer offset
-
-    ;xor dx, dx                                 ; This allows us to access even more sectors!
-
-    div word [sectorsPerTrack]                  ; Divide the lba (value in ax:dx) by sectorsPerTrack
+    div word [sectorsPerTrack]                  ; Divide lba by the sectors per track
     mov cx, dx                                  ; Save the absolute sector value 
     inc cx
 
     xor dx, dx                                  ; Divide by the number of heads
     div word [heads]                            ; to get absolute head and track values
-    mov dh, dl                                  ; Save the absolute head to bh
+    mov dh, dl                                  ; Move the absolute head into dh
 
     mov ch, al                                  ; Low 8 bits of absolute track
-    shl ah, 1                                   ; High 2 bits of absolute track
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
+    push cx
+    mov cl, 6                                   ; High 2 bits of absolute track
+    shl ah, cl
+    pop cx
     or cl, ah                                   ; Now cx is set with respective track and sector numbers
- 
-    mov dl, byte [drive]                        ; Set correct drive for int 13h
-    pop bx                                      ; Restore disk buffer offset
-    
+
+    mov dl, byte [cs:drive]                     ; Set correct drive for int 13h
+
     mov di, 5                                   ; Try five times to read the sector
 
   .attemptRead:
@@ -245,7 +223,7 @@ readSectors:
     dec di                                      ; Decrease read attempt counter
     jnz .attemptRead                            ; Try to read the sector again
 
-    jmp .readError
+    jmp .readError                              ; Error reading the disk
 
   .readOk:
     pop dx
@@ -253,7 +231,10 @@ readSectors:
     pop ax
 
     clc
-    inc ax                                      ; Increase the next sector to read
+    add ax, 1                                   ; Add one for the the next lba value
+    adc dx, 0                                   ; Make sure to adjust dx for carry
+
+    clc
     add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
     jnc .nextSector 
 
@@ -302,9 +283,9 @@ writeSectors:
 ; Write sectors starting at a given sector by 
 ; the given number, writes data from the buffer to disk.
 ;
-; Expects: ES:DI = Location of data
-;          AX:DX = Starting sector/ lba
-;          CX    = Number of sectors to write     
+; Expects: AX:DX = Starting sector/ lba
+;          ES:DI = Location of data to wrtie
+;          CX    = Number of sectors to write
 ;
 ; Returns: CF    = Carry flag set on error
 ;
@@ -321,44 +302,36 @@ writeSectors:
     mov bx, cs                                  ; Ensure corret data segment
     mov ds, bx
 
-    mov bx, di                                  ; Set disk buffer offset to bx
+    mov bx, di                                  ; Convert es:di to es:bx for int 13h
 
   .sectorLoop:
     push ax
     push cx
     push dx
 
-    push bx                                     ; Save disk buffer offset
-    
-    ;xor dx, dx                                 ; This will allow us to access more sectors!
-    
-    div word [sectorsPerTrack]                  ; Divide the lba (value in ax:dx) by sectorsPerTrack
+    div word [sectorsPerTrack]                  ; Divide lba by the sectors per track
     mov cx, dx                                  ; Save the absolute sector value 
     inc cx
 
     xor dx, dx                                  ; Divide by the number of heads
     div word [heads]                            ; to get absolute head and track values
-    mov bh, dl                                  ; Save the absolute head to bh
+    mov dh, dl                                  ; Move the absolute head into dh
 
     mov ch, al                                  ; Low 8 bits of absolute track
-    shl ah, 1                                   ; High 2 bits of absolute track
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
-    shl ah, 1
+    push cx
+    mov cl, 6                                   ; High 2 bits of absolute track
+    shl ah, cl
+    pop cx
     or cl, ah                                   ; Now cx is set with respective track and sector numbers
- 
-    mov dl, byte [drive]                        ; Set correct drive for int 13h
-    mov dh, bh                                  ; Move the absolute head into dh
-    pop bx                                      ; Restore disk buffer offset
 
-    mov di, 5                                   ; Try five times to write the sector
+    mov dl, byte [cs:drive]                     ; Set correct drive for int 13h
+
+    mov di, 5                                   ; Try five times to read the sector
 
   .attemptWrite:
     mov ax, 0x0301                              ; Write sectors func of int 13h, write one sector
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
-    jnc .writeOk                                 ; If no carry set, the sector has been written
+    jnc .writeOk                                ; If no carry set, the sector has been written
   
     xor ah, ah                                  ; Reset Drive func of int 13h
     int 0x13                                    ; Call int 13h (BIOS disk I/O)
@@ -366,7 +339,7 @@ writeSectors:
     dec di                                      ; Decrease write attempt counter
     jnz .attemptWrite                           ; Try to write the sector again
 
-    jmp .writeError
+    jmp .writeError                             ; Error writing to the disk
 
   .writeOk:
     pop dx
@@ -374,7 +347,10 @@ writeSectors:
     pop ax
 
     clc
-    inc ax                                      ; Increase the next sector to write
+    add ax, 1                                   ; Add one for the the next lba value
+    adc dx, 0                                   ; Make sure to adjust dx for carry
+
+    clc
     add bx, word [bytesPerSector]               ; Add to the buffer address for the next sector
     jnc .nextSector 
 
@@ -704,8 +680,8 @@ allocCwd:
     mov ds, ax
 
     xor dx, dx
-    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
-    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    mov ax, 32                                  ; Calculate the size of the root dir in sectors
+    mul word [rootDirEntries]                   ; Multiply the number of root dir entries by 32
     xchg ax, dx
 
     call memAllocBytes                          ; Allocate memory
@@ -750,8 +726,8 @@ freeCwd:
     mov ds, ax
 
     xor dx, dx
-    mov ax, 32                                  ; Size of root dir in bytes = (rootDirEntries * 32)
-    mul word [rootDirEntries]                   ; Multiply by the total size of the root directory
+    mov ax, 32                                  ; Calculate the size of the root dir in sectors
+    mul word [rootDirEntries]                   ; Multiply the number of root dir entries by 32
     xchg ax, dx
 
     call memFreeBytes                           ; Free memory
@@ -880,11 +856,10 @@ readFat:
     mov dx, cs                                  ; Ensure correct data segment
     mov ds, dx
 
-    xor dx, dx
-    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [fats]                         ; Move number of fats into al
-    mul word [fatSectors]                       ; Move fat sectors into bx
-    xor cx, cx
+    xor ah, ah
+    xor dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [fats]                         ; Take the number of fats
+    mul word [fatSectors]                       ; And multiply that by the number of sectors per fat
     mov cx, ax                                  ; Store in cx
 
     mov ax, word [reservedSectors]              ; Convert the first fat on the disk
@@ -935,11 +910,10 @@ writeFat:
     mov dx, cs                                  ; Ensure correct data segment
     mov ds, dx
 
-    xor dx, dx
-    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [fats]                         ; Move number of fats into al
-    mul word [fatSectors]                       ; Move fat sectors into bx
-    xor cx, cx
+    xor ah, ah
+    xor dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [fats]                         ; Take the number of fats
+    mul word [fatSectors]                       ; And multiply that by the number of sectors per fat
     mov cx, ax                                  ; Store in cx
 
     mov ax, word [reservedSectors]              ; Convert the first fat on the disk
@@ -986,10 +960,10 @@ allocFat:
     mov ax, cs
     mov ds, ax
 
-    xor dx, dx
-    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [fats]                         ; Move number of fats into al
-    mul word [fatSectors]                       ; Move fat sectors into bx
+    xor ah, ah
+    xor dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [fats]                         ; Take the number of fats
+    mul word [fatSectors]                       ; And multiply that by the number of sectors per fat
     xor dx, dx
     mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector   
     xchg ax, dx
@@ -1038,10 +1012,10 @@ freeFat:
     mov ax, cs
     mov ds, ax
 
-    xor dx, dx
-    xor ah, ah                                  ; Size of fat = (fats * fatSectors)
-    mov al, byte [fats]                         ; Move number of fats into al
-    mul word [fatSectors]                       ; Move fat sectors into bx
+    xor ah, ah
+    xor dx, dx                                  ; Calculate the size of fat in sectors
+    mov al, byte [fats]                         ; Take the number of fats
+    mul word [fatSectors]                       ; And multiply that by the number of sectors per fat
     xor dx, dx
     mul word [bytesPerSector]                   ; Divided by the number of bytes used per sector   
     xchg ax, dx
@@ -2174,7 +2148,7 @@ writeFile:
 ;---------------------------------------------------
 roundFilesize:
 ;
-; Round the filesize bassed on bytes.
+; Round the filesize based on bytes.
 ;
 ; Expects: DX:AX = Filesize
 ;
@@ -2192,10 +2166,9 @@ roundFilesize:
     push dx
     
     xor dx, dx
-    xor bh, bh                                  ; Calculate the size in bytes per cluster
-    mov ax, word [bytesPerSector]               ; So, take the bytes per sector
-    mov bl, byte [sectorsPerCluster]            ; and mul that by the sectors per cluster
-    mul bx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
     
     xchg ax, bx
     xchg dx, cx
@@ -2204,10 +2177,12 @@ roundFilesize:
     pop dx
     call u32x32div
     inc ax
-
     mov bx, ax
-    mov ax, word [bytesPerCluster]
-    mov dx, word [bytesPerCluster+2]
+ 
+    xor dx, dx
+    xor ah, ah                                  ; Calculate the size in bytes per cluster
+    mov al, byte [sectorsPerCluster]            ; So, take the sectors per cluster
+    mul word [bytesPerSector]                   ; And mul that by the bytes per sector
     call u32x16mul
 
     xchg ax, dx
