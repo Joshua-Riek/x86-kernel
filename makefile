@@ -64,7 +64,7 @@ ifeq ($(and $(shell which $(LD)),$(shell which $(OBJCOPY))),)
 kernel: $(BINDIR)/kernel.bin
 
 $(BINDIR)/kernel.bin: $(SRCDIR)/kernel.asm $(INCLUDES) | $(BINDIR)
-	$(NASM) $< -f bin -o $@
+	$(NASM) $< -O0 -f bin -o $@
 else
 kernel: $(BINDIR)/kernel.bin
 
